@@ -108,10 +108,10 @@ namespace IoTSharp
                     services.ConfigureCassandra(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
                     settings.TelemetryStorage = TelemetryStorage.SingleTable;
                     break;
-                case DataBaseType.ClickHouse:
-                    services.ConfigureClickHouse(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    settings.TelemetryStorage = TelemetryStorage.SingleTable;
-                    break;
+                // case DataBaseType.ClickHouse:
+                //     services.ConfigureClickHouse(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
+                //     settings.TelemetryStorage = TelemetryStorage.SingleTable;
+                //     break;
                 case DataBaseType.PostgreSql:
                 default:
                     services.ConfigureNpgsql(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
@@ -215,7 +215,7 @@ namespace IoTSharp
                         break;
                 }
             });
-            services.AddTelemetryStorage( settings, healthChecks);
+            services.AddTelemetryStorage(settings, healthChecks);
             var zmq = Configuration.GetSection(nameof(ZMQOption)).Get<ZMQOption>();
             if (zmq != null)
             {
@@ -258,12 +258,12 @@ namespace IoTSharp
             services.AddTransient<PublishAlarmDataTask>();
             services.AddTransient<RawDataGateway>();
             services.AddTransient<KepServerEx>();
-    
+
             if (Environment.GetEnvironmentVariable("IOTSHARP_ACME") == "true")
             {
-                    services.AddLettuceEncrypt()
-                            .PersistDataToDirectory(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "security")), "kissme")
-                            .Services.AddAliDnsChallengeProvider();
+                services.AddLettuceEncrypt()
+                        .PersistDataToDirectory(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "security")), "kissme")
+                        .Services.AddAliDnsChallengeProvider();
                 services.AddHsts(options =>
                 {
                     options.Preload = true;
@@ -312,10 +312,10 @@ namespace IoTSharp
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
-           
+
             app.CheckApplicationDBMigrations();
             //添加定时任务创建表
-     
+
             app.UseRouting();
             app.UseCors(option => option
                 .AllowAnyOrigin()
@@ -335,7 +335,7 @@ namespace IoTSharp
                 var frp = app.ApplicationServices.GetService<FlowRuleProcessor>();
                 return frp.RunRules;
             });
-          
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapMqtt("/mqtt");
@@ -347,7 +347,7 @@ namespace IoTSharp
                 endpoints.MapHealthChecksUI();
                 endpoints.MapDefaultControllerRoute();
                 endpoints.MapRazorPages();
-                endpoints.MapMcp("/mcp/{api_key}");  
+                endpoints.MapMcp("/mcp/{api_key}");
             });
 
             app.UseJdenticon(defaultStyle =>

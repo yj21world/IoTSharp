@@ -14,7 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections;
-using IdentityModel.OidcClient;
+// using IdentityModel.OidcClient;
 using System.Buffers;
 
 namespace IoTSharp.Services.MQTTControllers
@@ -240,7 +240,7 @@ namespace IoTSharp.Services.MQTTControllers
             {
                 _logger.LogError(ex, $"调用KepServerEx失败:{ex.Message}");
             }
-   
+
         }
     }
 }
