@@ -65,6 +65,7 @@
 		<PackageReference Include="EasyCaching.InMemory" Version="1.9.2" />
 		<PackageReference Include="EasyCaching.LiteDB" Version="1.9.2" />
 		<PackageReference Include="EasyCaching.Redis" Version="1.9.2" />
+		<PackageReference Include="EasyCaching.Serialization.Json" Version="1.9.2" />
 		<PackageReference Include="Figgle" Version="0.6.6" />
 		<PackageReference Include="Figgle.Fonts" Version="0.6.6" />
 		<PackageReference Include="hyjiacan.pinyin4net" Version="4.1.1" />

@@ -200,7 +200,9 @@ namespace IoTSharp
                                 var hx = h.Split(':');
                                 config.DBConfig.Endpoints.Add(new ServerEndPoint(hx[0], int.Parse(hx[1])));
                             });
-                        }, "iotsharp");
+                            config.SerializerName = "json";
+                        }, _hc_Caching);
+                        options.WithJson("json");
                         healthChecks.AddRedis(settings.CachingUseRedisHosts, name: _hc_Caching);
                         break;
 
