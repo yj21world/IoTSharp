@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-// using Microsoft.Identity.Client.Extensions.Msal;
 using MongoDB.Driver.Core.Servers;
 using System;
 using System.Threading.Tasks;
@@ -28,7 +27,7 @@ namespace IoTSharp.Controllers
         private readonly IPublisher _queue;
         private IEasyCachingProvider _caching;
 
-        public MetricsController( ILogger<MetricsController> logger, IPublisher queue, IEasyCachingProviderFactory factory, IOptions<AppSettings> options)
+        public MetricsController(ILogger<MetricsController> logger, IPublisher queue, IEasyCachingProviderFactory factory, IOptions<AppSettings> options)
         {
             _logger = logger;
             _queue = queue;
@@ -48,7 +47,7 @@ namespace IoTSharp.Controllers
         {
             try
             {
-                var data = await _caching.GetAsync(nameof(EventBusMetrics), async ()=> await _queue.GetMetrics(),TimeSpan.FromMinutes(1));
+                var data = await _caching.GetAsync(nameof(EventBusMetrics), async () => await _queue.GetMetrics(), TimeSpan.FromMinutes(1));
                 return new ApiResult<EventBusMetrics>(ApiCode.Success, "Ok", data.Value);
             }
             catch (Exception ex)

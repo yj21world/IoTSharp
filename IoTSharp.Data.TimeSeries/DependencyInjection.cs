@@ -2,8 +2,6 @@
 using IoTSharp.Data.Shardings;
 using IoTSharp.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using ShardingCore.TableExists.Abstractions;
-using ShardingCore.TableExists;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,16 +11,14 @@ using ShardingCore;
 using IoTSharp.Data.Shardings.Routes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.ObjectPool;
-using ShardingCore.Core.ShardingConfigurations;
 using IoTSharp.Data.Taos;
 using InfluxDB.Client;
-using PinusDB.Data;
 
 namespace IoTSharp.Data.TimeSeries
 {
     public static class DependencyInjection
     {
-        public  static void AddTelemetryStorage(this IServiceCollection services, AppSettings settings, IHealthChecksBuilder healthChecks)
+        public static void AddTelemetryStorage(this IServiceCollection services, AppSettings settings, IHealthChecksBuilder healthChecks)
         {
             string _hc_telemetryStorage = $"{nameof(TelemetryStorage)}-{Enum.GetName(settings.TelemetryStorage)}";
             var _connectionString = settings.ConnectionStrings["TelemetryStorage"];
@@ -87,27 +83,18 @@ namespace IoTSharp.Data.TimeSeries
 
                 case TelemetryStorage.Taos:
                     services.AddSingleton<IStorage, TaosStorage>();
-                    healthChecks.AddTDengine(new TaosConnectionStringBuilder( _connectionString).UseRESTful().ConnectionString, name: _hc_telemetryStorage);
+                    healthChecks.AddTDengine(new TaosConnectionStringBuilder(_connectionString).UseRESTful().ConnectionString, name: _hc_telemetryStorage);
                     break;
                 case TelemetryStorage.InfluxDB:
                     //https://github.com/julian-fh/influxdb-setup
                     services.AddSingleton<IStorage, InfluxDBStorage>();
                     //"TelemetryStorage": "http://localhost:8086/?org=iotsharp&bucket=iotsharp-bucket&token=iotsharp-token"
-                    services.AddObjectPool(()=>new InfluxDBClient( InfluxDBClientOptions.Builder.CreateNew().ConnectionString(_connectionString).Build()));
+                    services.AddObjectPool(() => new InfluxDBClient(InfluxDBClientOptions.Builder.CreateNew().ConnectionString(_connectionString).Build()));
                     healthChecks.AddInfluxDB(_connectionString, name: _hc_telemetryStorage);
                     break;
 
                 case TelemetryStorage.PinusDB:
-                    services.AddSingleton<IStorage, PinusDBStorage>();
-                    services.AddObjectPool(() =>
-                    {
-                        var cnt = new PinusConnection(_connectionString);
-                        cnt.Open();
-                        return cnt;
-                    });
-                    healthChecks.AddPinusDB(_connectionString, name: _hc_telemetryStorage);
-                    break;
-
+                    throw new NotSupportedException("PinusDB is not supported yet");
                 case TelemetryStorage.TimescaleDB:
                     services.AddSingleton<IStorage, TimescaleDBStorage>();
                     break;

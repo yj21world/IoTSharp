@@ -37,7 +37,7 @@ namespace IoTSharp.Controllers
             var profile = this.GetUserProfile();
 
             Expression<Func<Asset, bool>> condition = x =>
-                x.Customer.Id == profile.Customer && x.Tenant.Id == profile.Tenant && x.Deleted==false;
+                x.Customer.Id == profile.Customer && x.Tenant.Id == profile.Tenant && x.Deleted == false;
 
 
             if (!string.IsNullOrEmpty(m.Name))
@@ -57,11 +57,23 @@ namespace IoTSharp.Controllers
         [HttpGet]
         public async Task<ApiResult<PagedData<AssetRelation>>> AssetRelations(Guid assetid)
         {
-            var data =new  PagedData<AssetRelation>();
             var result = await _context.Assets.Include(c => c.OwnedAssets).SingleOrDefaultAsync(c => c.Id == assetid);
-            data.rows = result.OwnedAssets;
-            data.total = result.OwnedAssets.Count;
-            return new ApiResult<PagedData<AssetRelation>>(ApiCode.Success, "OK",  data);
+            if (result is null)
+            {
+                return new ApiResult<PagedData<AssetRelation>>(ApiCode.CantFindObject, "can't find that asset", new PagedData<AssetRelation>
+                {
+                    rows = new List<AssetRelation>(),
+                    total = 0
+                });
+            }
+
+            var data = new PagedData<AssetRelation>
+            {
+                rows = result.OwnedAssets,
+                total = result.OwnedAssets.Count
+            };
+
+            return new ApiResult<PagedData<AssetRelation>>(ApiCode.Success, "OK", data);
         }
 
         /// <summary>
@@ -79,13 +91,13 @@ namespace IoTSharp.Controllers
 
             var result = _context.Assets.Include(c => c.OwnedAssets)
                 .SingleOrDefault(x =>
-                    x.Id == assetid && x.Customer.Id == profile.Customer && x.Tenant.Id == profile.Tenant && x.Deleted==false)?.OwnedAssets
+                    x.Id == assetid && x.Customer.Id == profile.Customer && x.Tenant.Id == profile.Tenant && x.Deleted == false)?.OwnedAssets
                 .ToList().GroupBy(c => c.DeviceId).Select(c => new
-                    {
-                        Device = c.Key,
-                        Attrs = c.Where(c => c.DataCatalog == DataCatalog.AttributeLatest).ToList(),
-                        Temps = c.Where(c => c.DataCatalog == DataCatalog.TelemetryLatest).ToList()
-                    }
+                {
+                    Device = c.Key,
+                    Attrs = c.Where(c => c.DataCatalog == DataCatalog.AttributeLatest).ToList(),
+                    Temps = c.Where(c => c.DataCatalog == DataCatalog.TelemetryLatest).ToList()
+                }
                 ).ToList().Join(_context.Device, x => x.Device, y => y.Id, (x, y) => new AssetDeviceItem
                 {
                     Id = x.Device,
@@ -95,17 +107,23 @@ namespace IoTSharp.Controllers
                     Timeout = y.Timeout,
                     Attrs = x.Attrs.Select(c => new ModelAssetAttrItem
                     {
-                        dataSide = c.DataCatalog, keyName = c.KeyName, Name = c.Name, Description = c.Description,
+                        dataSide = c.DataCatalog,
+                        keyName = c.KeyName,
+                        Name = c.Name,
+                        Description = c.Description,
                         Id = c.Id
                     }).ToArray(),
                     Temps = x.Temps.Select(c => new ModelAssetAttrItem
                     {
-                        dataSide = c.DataCatalog, keyName = c.KeyName, Name = c.Name, Description = c.Description,
+                        dataSide = c.DataCatalog,
+                        keyName = c.KeyName,
+                        Name = c.Name,
+                        Description = c.Description,
                         Id = c.Id
                     }).ToArray(),
                 }).ToList();
             return new ApiResult<PagedData<AssetDeviceItem>>(ApiCode.Success, "OK",
-                new PagedData<AssetDeviceItem>() {total = result?.Count ?? 0, rows = result}
+                new PagedData<AssetDeviceItem>() { total = result?.Count ?? 0, rows = result }
             );
 
         }
@@ -121,7 +139,7 @@ namespace IoTSharp.Controllers
         {
             var profile = this.GetUserProfile();
             var asset = await _context.Assets.Include(c => c.Customer).Include(c => c.Tenant).SingleOrDefaultAsync(c =>
-                c.Id == id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted==false);
+                c.Id == id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted == false);
             if (asset != null)
             {
                 return new ApiResult<AssetDto>(ApiCode.Success, "OK",
@@ -148,7 +166,7 @@ namespace IoTSharp.Controllers
 
             var profile = this.GetUserProfile();
             var asset = await _context.Assets.Include(c => c.Customer).Include(c => c.Tenant).SingleOrDefaultAsync(c =>
-                c.Id == dto.Id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted==false);
+                c.Id == dto.Id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted == false);
             if (asset == null)
             {
 
@@ -213,7 +231,7 @@ namespace IoTSharp.Controllers
             {
                 var asset = await _context.Assets.Include(c => c.Customer).Include(c => c.Tenant)
                     .Include(c => c.OwnedAssets).SingleOrDefaultAsync(c =>
-                        c.Id == id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted==false);
+                        c.Id == id && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted == false);
                 if (asset == null)
                 {
 
@@ -246,7 +264,7 @@ namespace IoTSharp.Controllers
             {
                 var asset = await _context.Assets.Include(c => c.Customer).Include(c => c.Tenant)
                     .Include(c => c.OwnedAssets).SingleOrDefaultAsync(c =>
-                        c.Id == m.AssetId && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted==false);
+                        c.Id == m.AssetId && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted == false);
                 if (asset == null)
                 {
 
@@ -308,7 +326,7 @@ namespace IoTSharp.Controllers
             {
                 var asset = await _context.Assets.Include(c => c.Customer).Include(c => c.Tenant)
                     .Include(c => c.OwnedAssets).SingleOrDefaultAsync(c =>
-                        c.Id == m.AssetId && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted==false);
+                        c.Id == m.AssetId && c.Customer.Id == profile.Customer && c.Tenant.Id == profile.Tenant && c.Deleted == false);
 
                 await _context.SaveChangesAsync();
                 return new ApiResult<bool>(ApiCode.Success, "Ok", true);
@@ -381,4 +399,4 @@ namespace IoTSharp.Controllers
 
         }
     }
-} 
+}

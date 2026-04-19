@@ -371,11 +371,35 @@ namespace IoTSharp.Controllers
         [HttpPost]
         public ApiResult<bool> SaveDiagram(ModelWorkFlow m)
         {
+            if (m is null || string.IsNullOrWhiteSpace(m.Biz))
+            {
+                return new ApiResult<bool>(ApiCode.InValidData, "workflow payload is invalid", false);
+            }
+
+            Activity activity;
+            try
+            {
+                activity = JsonConvert.DeserializeObject<Activity>(m.Biz);
+            }
+            catch (JsonException ex)
+            {
+                return new ApiResult<bool>(ApiCode.InValidData, ex.Message, false);
+            }
+
+            if (activity is null || activity.RuleId == Guid.Empty)
+            {
+                return new ApiResult<bool>(ApiCode.InValidData, "workflow payload is invalid", false);
+            }
+
             var profile = this.GetUserProfile();
-            var activity = JsonConvert.DeserializeObject<Activity>(m.Biz);
             var CreatorId = Guid.NewGuid();
             var CreateDate = DateTime.UtcNow;
             var rule = _context.FlowRules.Include(c => c.Customer).Include(c => c.Tenant).FirstOrDefault(c => c.RuleId == activity.RuleId);
+            if (rule is null)
+            {
+                return new ApiResult<bool>(ApiCode.CantFindObject, "can't find that rule", false);
+            }
+
             rule.DefinitionsXml = m.Xml;
             rule.Creator = profile.Id.ToString();
             rule.CreateId = CreatorId;
@@ -715,9 +739,9 @@ namespace IoTSharp.Controllers
                                     bpmnid = item.nodeId,
                                     FlowType = item.nodenamespace,
                                     NodeProcessParams = item.content,
-									NodeProcessScriptType = item.nodetype,
+                                    NodeProcessScriptType = item.nodetype,
 
-									NodeProcessClass = item.mata,
+                                    NodeProcessClass = item.mata,
                                     FlowStatus = 1,
                                     CreateId = CreatorId,
                                     Createor = profile.Id,
@@ -751,7 +775,7 @@ namespace IoTSharp.Controllers
                                     CreateDate = CreateDate,
                                     Customer = rule.Customer,
                                     Tenant = rule.Tenant,
-									FlowClass = item.nodeclass,
+                                    FlowClass = item.nodeclass,
                                     FlowNameSpace = item.nodetype,
                                     FlowIcon = item.icon,
                                     Top = item.top,
@@ -799,7 +823,7 @@ namespace IoTSharp.Controllers
             {
                 return new ApiResult<bool>(ApiCode.Exception, exception.Message, false);
             }
-        
+
         }
 
         [HttpGet]
@@ -821,70 +845,70 @@ namespace IoTSharp.Controllers
                     switch (item.FlowNameSpace)
                     {
                         case "line":
-                        {
-                            m.lines.Add(new LineObject()
                             {
-                                sourceId = item.SourceId,
-                                linename = item.Flowname,
-                                targetId = item.TargetId,
-                                condition = item.Conditionexpression,
-                                linenamespace=item.FlowType,
-                                lineId = item.bpmnid,
-                            });
-                        }
+                                m.lines.Add(new LineObject()
+                                {
+                                    sourceId = item.SourceId,
+                                    linename = item.Flowname,
+                                    targetId = item.TargetId,
+                                    condition = item.Conditionexpression,
+                                    linenamespace = item.FlowType,
+                                    lineId = item.bpmnid,
+                                });
+                            }
                             break;
                         case "basic":
-                        {
-                            m.nodes.Add(new NodeObject()
                             {
+                                m.nodes.Add(new NodeObject()
+                                {
 
-                                nodeId = item.bpmnid,
-                                nodetype = item.FlowNameSpace,
-                                name = item.Flowname,
-                                nodeclass = item.FlowClass,
-                                nodenamespace = item.FlowType,
-                                icon = item.FlowIcon,
-                                top = item.Top,
-                                left = item.Left
-                            });
-                        }
+                                    nodeId = item.bpmnid,
+                                    nodetype = item.FlowNameSpace,
+                                    name = item.Flowname,
+                                    nodeclass = item.FlowClass,
+                                    nodenamespace = item.FlowType,
+                                    icon = item.FlowIcon,
+                                    top = item.Top,
+                                    left = item.Left
+                                });
+                            }
                             break;
                         case "script":
-                        {
-                            m.nodes.Add(new NodeObject()
                             {
+                                m.nodes.Add(new NodeObject()
+                                {
 
-                                nodeId = item.bpmnid,
-                                nodetype = item.FlowNameSpace,
-                                name = item.Flowname,
-                                content = item.NodeProcessScript,
-                                mata = item.NodeProcessScriptType,
-                                nodeclass = item.FlowClass,
-                                nodenamespace = item.FlowType,
-                                icon = item.FlowIcon,
-                                top = item.Top,
-                                left = item.Left
-                            });
-                        }
+                                    nodeId = item.bpmnid,
+                                    nodetype = item.FlowNameSpace,
+                                    name = item.Flowname,
+                                    content = item.NodeProcessScript,
+                                    mata = item.NodeProcessScriptType,
+                                    nodeclass = item.FlowClass,
+                                    nodenamespace = item.FlowType,
+                                    icon = item.FlowIcon,
+                                    top = item.Top,
+                                    left = item.Left
+                                });
+                            }
                             break;
                         case "executor":
-                        {
-                            m.nodes.Add(new NodeObject()
                             {
+                                m.nodes.Add(new NodeObject()
+                                {
 
-                                nodeId = item.bpmnid,
-                                nodetype = item.FlowNameSpace,
-                                name = item.Flowname,
-                                content = item.NodeProcessParams,
-                                mata = item.NodeProcessClass,
-                                nodeclass = item.FlowClass,
-                                nodenamespace = item.FlowType,
-                                icon = item.FlowIcon,
-                                top = item.Top,
-                                left = item.Left
+                                    nodeId = item.bpmnid,
+                                    nodetype = item.FlowNameSpace,
+                                    name = item.Flowname,
+                                    content = item.NodeProcessParams,
+                                    mata = item.NodeProcessClass,
+                                    nodeclass = item.FlowClass,
+                                    nodenamespace = item.FlowType,
+                                    icon = item.FlowIcon,
+                                    top = item.Top,
+                                    left = item.Left
 
-                            });
-                        }
+                                });
+                            }
                             break;
 
 
@@ -910,6 +934,11 @@ namespace IoTSharp.Controllers
         {
             var profile = this.GetUserProfile();
             var ruleflow = await _context.FlowRules.FirstOrDefaultAsync(c => c.RuleId == id && c.Tenant.Id == profile.Tenant);
+            if (ruleflow is null)
+            {
+                return new ApiResult<Activity>(ApiCode.CantFindObject, "can't find that rule", null);
+            }
+
             Activity activity = new Activity();
 
             activity.SequenceFlows ??= new List<SequenceFlow>();
@@ -1393,14 +1422,26 @@ namespace IoTSharp.Controllers
         [HttpPost]
         public async Task<ApiResult<dynamic>> Active([FromBody] JObject form)
         {
-            var profile = this.GetUserProfile();
-            var formdata = form.First.First;
-            var extradata = form.First.Next;
-            var obj = extradata.First.First.First.Value<JToken>();
-            var __ruleid = obj.Value<string>();
-            var ruleid = Guid.Parse(__ruleid);
+            if (form is null || !form.HasValues)
+            {
+                return new ApiResult<dynamic>(ApiCode.InValidData, "workflow payload is invalid", null);
+            }
 
-            var d = formdata.Value<JToken>().ToObject<object>();
+            var profile = this.GetUserProfile();
+            var formEntry = form.First;
+            var formdata = formEntry?.First;
+            var extradata = formEntry?.Next;
+            var ruleToken = extradata?.First?.First?.First?.Value<JToken>();
+            if (formdata is null || ruleToken is null || !Guid.TryParse(ruleToken.Value<string>(), out var ruleid))
+            {
+                return new ApiResult<dynamic>(ApiCode.InValidData, "workflow payload is invalid", null);
+            }
+
+            var d = formdata.Value<JToken>()?.ToObject<object>();
+            if (d is null)
+            {
+                return new ApiResult<dynamic>(ApiCode.InValidData, "workflow payload is invalid", null);
+            }
 
 
 
@@ -1491,6 +1532,11 @@ namespace IoTSharp.Controllers
         {
             var profile = this.GetUserProfile();
             var _event = _context.BaseEvents.Include(c => c.FlowRule).SingleOrDefault(c => c.EventId == eventId);
+            if (_event is null || _event.FlowRule is null)
+            {
+                return new ApiResult<dynamic>(ApiCode.CantFindObject, "can't find that event", null);
+            }
+
             var _operations = _context.FlowOperations.Include(c => c.Flow).Where(c => c.BaseEvent == _event).ToList();
 
 
@@ -1628,7 +1674,7 @@ namespace IoTSharp.Controllers
         public async Task<ApiResult<RuleTaskExecutorTestResultDto>> TestTask(RuleTaskExecutorTestDto m)
         {
             var profile = this.GetUserProfile();
-            var result = await  _flowRuleProcessor.TestScript(m.ruleId, m.flowId, m.Data);
+            var result = await _flowRuleProcessor.TestScript(m.ruleId, m.flowId, m.Data);
             await _context.SaveChangesAsync();
             return new ApiResult<RuleTaskExecutorTestResultDto>(ApiCode.Success, "Ok", new RuleTaskExecutorTestResultDto() { Data = result.Data });
         }
@@ -1636,10 +1682,20 @@ namespace IoTSharp.Controllers
         [HttpPost("RuleCondition")]
         public async Task<ApiResult<ConditionTestResult>> RuleCondition([FromBody] RuleTaskFlowTestResultDto m)
         {
+            if (m is null || string.IsNullOrWhiteSpace(m.Data) || m.ruleId == Guid.Empty || m.flowId == Guid.Empty)
+            {
+                return new ApiResult<ConditionTestResult>(ApiCode.InValidData, "rule condition payload is invalid", null);
+            }
+
             var profile = this.GetUserProfile();
             var data = JsonConvert.DeserializeObject(m.Data) as JObject;
+            if (data is null)
+            {
+                return new ApiResult<ConditionTestResult>(ApiCode.InValidData, "rule condition payload is invalid", null);
+            }
+
             var d = data.ToObject(typeof(ExpandoObject));
-            var result = await  _flowRuleProcessor.TestCondition(m.ruleId, m.flowId, d);
+            var result = await _flowRuleProcessor.TestCondition(m.ruleId, m.flowId, d);
             return new ApiResult<ConditionTestResult>(ApiCode.Success, "Ok", result);
         }
     }

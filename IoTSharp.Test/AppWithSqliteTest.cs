@@ -1,47 +1,26 @@
-﻿using Alba;
-using DotNet.Testcontainers.Containers;
-using IoTSharp.Contracts;
-using IoTSharp.Controllers;
-using IoTSharp.Dtos;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
+﻿#nullable enable
+
 using System.Threading.Tasks;
+using Xunit;
 
 namespace IoTSharp.Test
 {
-    [TestClass]
-    public class AppWithSqliteTest : AppInstance
+    public sealed class AppWithSqliteTest : IClassFixture<SqliteAppFixture>
     {
-      
-        [ClassInitialize]
-        public static void TextFixtureSetup(TestContext context) => FixtureSetup(context);
+        private readonly SqliteAppFixture _fixture;
 
-
-
-        [TestInitialize()]
-        public async Task TestServerInitialize()
+        public AppWithSqliteTest(SqliteAppFixture fixture)
         {
-            _ct = _context.CancellationTokenSource.Token;
-            await AppInitialize("Data Source=.data/IoTSharp.db", "Data Source=.data/TelemetryStorage.db", DataBaseType.Sqlite);
+            _fixture = fixture;
         }
-        [TestCleanup]
-        public async Task Cleanup()
-        {
-            await  AppCleanup();
-        }
+
+        [Fact]
+        public Task AppIsInstalled() => _fixture.AssertAppIsInstalledAsync();
+
+        [Fact]
+        public Task AppAccountLogin() => _fixture.AssertAppAccountLoginAsync();
+
+        [Fact]
+        public Task AppDevicesCreate() => _fixture.AssertAppDevicesCreateAsync();
     }
 }

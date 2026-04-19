@@ -121,19 +121,19 @@ namespace IoTSharp.Controllers
             m.Limit = m.Limit < 5 ? 5 : m.Limit;
             try
             {
-            
-                var query=from  c in _context.Device.Include(c => c.DeviceIdentity) where c.Customer.Id == m.customerId && !c.Deleted && c.Tenant.Id == profile.Tenant select c;
+
+                var query = from c in _context.Device.Include(c => c.DeviceIdentity) where c.Customer.Id == m.customerId && !c.Deleted && c.Tenant.Id == profile.Tenant select c;
                 if (m.OnlyActive)
                 {
-                    var al = from a in _context.AttributeLatest where   a.KeyName == Constants._Active &&a.Value_Boolean==true   select a.DeviceId;
-                    query = from x in query where al.Contains( x.Id)   select x;
+                    var al = from a in _context.AttributeLatest where a.KeyName == Constants._Active && a.Value_Boolean == true select a.DeviceId;
+                    query = from x in query where al.Contains(x.Id) select x;
                 }
                 if (!string.IsNullOrEmpty(m.Name))
                 {
                     if (System.Text.RegularExpressions.Regex.IsMatch(m.Name, @"(?im)^[{(]?[0-9A-F]{8}[-]?(?:[0-9A-F]{4}[-]?){3}[0-9A-F]{12}[)}]?$"))
                     {
                         var id = Guid.Parse(m.Name);
-                        query = from  x in query  where   x.Id == id select x ;
+                        query = from x in query where x.Id == id select x;
                     }
                     else
                     {
@@ -148,10 +148,10 @@ namespace IoTSharp.Controllers
                     IdentityValue = x.DeviceIdentity.IdentityType == IdentityType.X509Certificate ? "" : x.DeviceIdentity.IdentityValue,
                     DeviceType = x.DeviceType,
                     Owner = x.Owner,
-                    TenantId=x.Tenant.Id,
-                    TenantName=x.Tenant.Name,
-                    CustomerId=x.Customer.Id,
-                    CustomerName=x.Customer.Name,
+                    TenantId = x.Tenant.Id,
+                    TenantName = x.Tenant.Name,
+                    CustomerId = x.Customer.Id,
+                    CustomerName = x.Customer.Name,
                     Timeout = x.Timeout,
                     IdentityType = x.DeviceIdentity.IdentityType
                 }).ToListAsync();
@@ -261,7 +261,7 @@ namespace IoTSharp.Controllers
                 var dev = cust.FirstOrDefault();
                 if (did != null && dev != null)
                 {
-               
+
                     if (Uri.TryCreate(_setting.MqttBroker.DomainName, UriKind.Absolute, out Uri _uri))
                     {
                         SubjectAlternativeNameBuilder altNames = new SubjectAlternativeNameBuilder();
@@ -400,7 +400,7 @@ namespace IoTSharp.Controllers
                                 DateTime = t.DateTime,
                                 KeyName = t.KeyName,
                                 DataType = t.Type,
-                                 DeviceId= t.DeviceId,
+                                DeviceId = t.DeviceId,
                                 Value = t.ToObject()
                             };
                 if (!devid.Any())
@@ -471,7 +471,7 @@ namespace IoTSharp.Controllers
             if (User.IsInRole(nameof(UserRole.TenantAdmin)))
             {
                 var tid = Guid.Parse(User.Claims.First(c => c.Type == IoTSharpClaimTypes.Tenant).Value);
-                dev = await _context.Device.Include(d => d.Tenant).Include(d=>d.Customer).Include(d=>d.DeviceIdentity).FirstOrDefaultAsync(d => d.Id == deviceId && d.Tenant.Id == tid && !d.Deleted);
+                dev = await _context.Device.Include(d => d.Tenant).Include(d => d.Customer).Include(d => d.DeviceIdentity).FirstOrDefaultAsync(d => d.Id == deviceId && d.Tenant.Id == tid && !d.Deleted);
             }
             else if (User.IsInRole(nameof(UserRole.NormalUser)))
             {
@@ -654,7 +654,7 @@ namespace IoTSharp.Controllers
                     TenantName = x.Tenant.Name,
                     CustomerName = x.Customer.Name,
                     TenantId = x.Tenant.Id,
-                    CustomerId= x.Customer.Id,
+                    CustomerId = x.Customer.Id,
                     DeviceType = x.DeviceType,
                     Owner = x.Owner,
                     Timeout = x.Timeout,
@@ -681,6 +681,11 @@ namespace IoTSharp.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ApiResult<bool>> PutDevice(Guid id, DevicePutDto device)
         {
+            if (device is null)
+            {
+                return new ApiResult<bool>(ApiCode.InValidData, "device payload is required", false);
+            }
+
             if (id != device.Id)
             {
                 return new ApiResult<bool>(ApiCode.InValidData, "Device's Identity not InValidData", false);
@@ -688,15 +693,17 @@ namespace IoTSharp.Controllers
 
             var cid = User.Claims.First(c => c.Type == IoTSharpClaimTypes.Customer);
             var tid = User.Claims.First(c => c.Type == IoTSharpClaimTypes.Tenant);
-            var dev = _context.Device.Include(d => d.Tenant).Include(d => d.Customer).First(d => d.Id == device.Id);
-            var tenid = dev.Tenant.Id;
-            var cusid = dev.Customer.Id;
+            var dev = _context.Device.Include(d => d.Tenant).Include(d => d.Customer).FirstOrDefault(d => d.Id == device.Id);
 
             if (dev == null)
             {
-                return new ApiResult<bool>(ApiCode.ExceptionDeviceIdentity, "Device's Identity not found", false);
+                return new ApiResult<bool>(ApiCode.NotFoundDevice, "Device's Identity not found", false);
             }
-            else if (dev.Tenant?.Id.ToString() != tid.Value || dev.Customer?.Id.ToString() != cid.Value)
+
+            var tenid = dev.Tenant?.Id;
+            var cusid = dev.Customer?.Id;
+
+            if (dev.Tenant?.Id.ToString() != tid.Value || dev.Customer?.Id.ToString() != cid.Value)
             {
                 return new ApiResult<bool>(ApiCode.DoNotAllow, "Do not allow access to devices from other customers or tenants", false);
             }
@@ -738,7 +745,7 @@ namespace IoTSharp.Controllers
         [ProducesDefaultResponseType]
         public async Task<ApiResult<Device>> PostDevice(Guid id, DevicePostProduceDto device)
         {
-            var produce = await _context.Produces.Include(p => p.DefaultAttributes).FirstOrDefaultAsync(p => p.Id == id && p.Deleted==false);
+            var produce = await _context.Produces.Include(p => p.DefaultAttributes).FirstOrDefaultAsync(p => p.Id == id && p.Deleted == false);
             if (produce == null)
             {
                 return new ApiResult<Device>(ApiCode.NotFoundProduce, "Not found Produce", null);
@@ -747,7 +754,7 @@ namespace IoTSharp.Controllers
             var dev = await PostDevice(dto);
             if (dev.Code == (int)ApiCode.Success)
             {
-                MapperConfiguration mapperConfiguration = new MapperConfiguration(options => { options.CreateMap<ProduceData, AttributeLatest>(); },_loggerFactory);
+                MapperConfiguration mapperConfiguration = new MapperConfiguration(options => { options.CreateMap<ProduceData, AttributeLatest>(); }, _loggerFactory);
                 IMapper mapper = mapperConfiguration.CreateMapper();
 
                 var atts = produce.DefaultAttributes.Select(c =>
@@ -789,7 +796,7 @@ namespace IoTSharp.Controllers
                 DeviceType = device.DeviceType,
                 Timeout = device.Timeout,
                 Deleted = false,
-                
+
             };
             devvalue.Tenant = _context.Tenant.Find(new Guid(tid.Value));
             devvalue.Customer = _context.Customer.Find(new Guid(cid.Value));
@@ -799,7 +806,7 @@ namespace IoTSharp.Controllers
                 return new ApiResult<Device>(ApiCode.NotFoundTenantOrCustomer, "Not found Tenant or Customer", null);
             }
             _context.Device.Add(devvalue);
-            _context.AfterCreateDevice(devvalue,device.ProductId);
+            _context.AfterCreateDevice(devvalue, device.ProductId);
             await _context.SaveChangesAsync();
             var identity = _context.DeviceIdentities.FirstOrDefault(c => c.Device.Id == devvalue.Id);
             if (identity != null)
@@ -835,7 +842,7 @@ namespace IoTSharp.Controllers
             {
                 if (device.DeviceType == DeviceType.Device)
                 {
-                    var assets = await _context.Assets.Where(c => c.OwnedAssets.Any(d => d.DeviceId == device.Id) && c.Deleted==false)
+                    var assets = await _context.Assets.Where(c => c.OwnedAssets.Any(d => d.DeviceId == device.Id) && c.Deleted == false)
                         .ToListAsync();
 
                     if (assets.Count > 0)
@@ -845,7 +852,7 @@ namespace IoTSharp.Controllers
                             assets.Aggregate("", (x, y) => x + "," + y.Name), false);
                     }
 
-                    var cert = _context.DeviceIdentities.Include(d=>d.Device).FirstOrDefault(c => c.Device.Id == device.Id);
+                    var cert = _context.DeviceIdentities.Include(d => d.Device).FirstOrDefault(c => c.Device.Id == device.Id);
                     if (cert != null)
                     {
                         _context.DeviceIdentities.RemoveRange(cert);
@@ -880,7 +887,7 @@ namespace IoTSharp.Controllers
                             "Please remove the following devices from the current gateway: " +
                             devices.Aggregate("", (x, y) => x + "," + y.Name), false);
                     }
-                    var assets = await _context.Assets.Where(c => c.OwnedAssets.Any(d => d.DeviceId == device.Id)   && c.Deleted==false)
+                    var assets = await _context.Assets.Where(c => c.OwnedAssets.Any(d => d.DeviceId == device.Id) && c.Deleted == false)
                         .ToArrayAsync();
 
                     if (assets.Length > 0)
@@ -890,7 +897,7 @@ namespace IoTSharp.Controllers
                             assets.Aggregate("", (x, y) => x + "," + y.Name), false);
                     }
 
-                    var cert = _context.DeviceIdentities.Include(c=>c.Device).FirstOrDefault(c => c.Device.Id == device.Id);
+                    var cert = _context.DeviceIdentities.Include(c => c.Device).FirstOrDefault(c => c.Device.Id == device.Id);
                     if (cert != null)
                     {
                         _context.DeviceIdentities.RemoveRange(cert);
@@ -1232,6 +1239,16 @@ namespace IoTSharp.Controllers
         [ProducesDefaultResponseType]
         public async Task<ApiResult<bool>> AddAttribute(string access_token, DeviceAttributeDto attribute)
         {
+            if (attribute is null || attribute.DeviceId == Guid.Empty || string.IsNullOrWhiteSpace(attribute.KeyName))
+            {
+                return new ApiResult<bool>(ApiCode.InValidData, "attribute payload is invalid", false);
+            }
+
+            if (!_context.Device.Any(c => c.Id == attribute.DeviceId))
+            {
+                return new ApiResult<bool>(ApiCode.NotFoundDevice, "device not found", false);
+            }
+
             if (_context.DataStorage.Any(c =>
                 c.DeviceId == attribute.DeviceId && c.KeyName.ToLower() == attribute.KeyName.ToLower()))
             {
@@ -1263,11 +1280,21 @@ namespace IoTSharp.Controllers
         [ProducesDefaultResponseType]
         public async Task<ApiResult<Dic>> EditAttribute(Guid devid, DeviceAttrEditDto attributes)
         {
+            if (devid == Guid.Empty || !_context.Device.Any(c => c.Id == devid))
+            {
+                return new ApiResult<Dic>(ApiCode.NotFoundDevice, "device not found", null);
+            }
+
+            attributes ??= new DeviceAttrEditDto();
+            attributes.anyside ??= new Dictionary<string, object>();
+            attributes.serverside ??= new Dictionary<string, object>();
+            attributes.clientside ??= new Dictionary<string, object>();
+
             var result = await _context.SaveAsync<AttributeLatest>(attributes.anyside, devid, DataSide.AnySide);
             var result1 = await _context.SaveAsync<AttributeLatest>(attributes.serverside, devid, DataSide.ServerSide);
             var result2 = await _context.SaveAsync<AttributeLatest>(attributes.clientside, devid, DataSide.ClientSide);
             //如果保存时数据为空，则也认为保存成功
-            if ((!attributes.anyside.Any()||(attributes.anyside.Any()&&result.ret > 0))
+            if ((!attributes.anyside.Any() || (attributes.anyside.Any() && result.ret > 0))
                 && (!attributes.serverside.Any() || (attributes.serverside.Any() && result1.ret > 0))
                 && (!attributes.clientside.Any() || (attributes.clientside.Any() && result2.ret > 0))
                 )

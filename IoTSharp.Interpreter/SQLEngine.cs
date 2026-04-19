@@ -1,84 +1,65 @@
-﻿using Jint;
-using Jint.Native;
-using Jint.Native.Json;
+#nullable enable
+
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading;
-using IoTSharp.Interpreter;
 using Microsoft.Extensions.Options;
-using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
 
 namespace IoTSharp.Interpreter
 {
-    public class SQLEngine : ScriptEngineBase, IDisposable
+    /// <summary>
+    /// Script engine that executes SQL queries over a JSON payload.
+    /// Internally delegates to <see cref="IoTSharp.Data.JsonDB.JsonDbExecutor"/>
+    /// from the IoTSharp.Data.JsonDB library.
+    /// </summary>
+    public sealed class SQLEngine : IDisposable
     {
-        private  Engine _engine;
-    
-        private bool disposedValue;
-        private  bool _loadjsondb;
+        private readonly ILogger<SQLEngine> _logger;
+        private readonly Dictionary<string, Func<IReadOnlyList<object?>, object?>> _methods =
+            new(StringComparer.OrdinalIgnoreCase);
 
-        public SQLEngine(ILogger<SQLEngine> logger, IOptions<EngineSetting> _opt):base(logger,_opt.Value, Task.Factory.CancellationToken)
+        public SQLEngine(ILogger<SQLEngine> logger, IOptions<EngineSetting> opt)
         {
-            var engine = new Engine(options =>
-            {
+            ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(opt);
+            ArgumentNullException.ThrowIfNull(opt.Value);
 
-                // Limit memory allocations to MB
-                options.LimitMemory(4_000_000);
-
-                // Set a timeout to 4 seconds.
-                options.TimeoutInterval(TimeSpan.FromSeconds(_opt.Value.Timeout));
-
-                // Set limit of 1000 executed statements.
-                // options.MaxStatements(1000);
-                // Use a cancellation token.
-                options.CancellationToken(_cancellationToken);
-            });
-            _engine = engine;
-          
+            _logger = logger;
         }
 
-
-        public  override string    Do(string _source,string input)
+        /// <summary>
+        /// Registers an external method that can be invoked from SQL expressions.
+        /// </summary>
+        public void RegisterMethod(string name, Func<IReadOnlyList<object?>, object?> method)
         {
-            if (!_loadjsondb)
+            if (string.IsNullOrWhiteSpace(name))
             {
-                _engine.Execute(Properties.Resources.jsonDB);
-                _loadjsondb = true;
+                throw new ArgumentException("Method name is required.", nameof(name));
             }
-            _engine.SetValue("data", input);
-            _engine.Execute("var jDB = jsonDB(JSON.parse(data) , 'input').init('jDB');");
-            _engine.Execute($"var result = jDB.query('{_source}');");
-            var result = _engine.GetValue("result");
-            var json = System.Text.Json.JsonSerializer.Serialize(result.ToObject());
-            _logger.LogDebug($"source:{Environment.NewLine}{ _source}{Environment.NewLine}{Environment.NewLine}input:{Environment.NewLine}{ input}{Environment.NewLine}{Environment.NewLine} ouput:{Environment.NewLine}{ json}{Environment.NewLine}{Environment.NewLine}");
+
+            ArgumentNullException.ThrowIfNull(method);
+            _methods[name] = method;
+        }
+
+        public string Do(string source, string input)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                throw new ArgumentException("SQL source is required.", nameof(source));
+            }
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                throw new ArgumentException("JSON input is required.", nameof(input));
+            }
+
+            var json = IoTSharp.Data.JsonDB.JsonDbExecutor.Execute(source, input, _methods);
+            _logger.LogDebug($"source:{Environment.NewLine}{source}{Environment.NewLine}{Environment.NewLine}input:{Environment.NewLine}{input}{Environment.NewLine}{Environment.NewLine} ouput:{Environment.NewLine}{json}{Environment.NewLine}{Environment.NewLine}");
             return json;
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-           
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    _engine= null;
-                    // TODO: 释放托管状态(托管对象)
-                }
-
-                // TODO: 释放未托管的资源(未托管的对象)并重写终结器
-                // TODO: 将大型字段设置为 null
-                disposedValue = true;
-            }
-        }
-
-
-
         public void Dispose()
         {
-            // 不要更改此代码。请将清理代码放入“Dispose(bool disposing)”方法中
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
     }
 }
-

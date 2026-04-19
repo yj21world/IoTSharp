@@ -2,15 +2,14 @@ using IoTSharp.Interpreter;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Text.Json;
+using Xunit;
 
 namespace IoTSharp.Test
 {
-    [TestClass]
     public class ScriptEngineTest
     {
-        [TestMethod]
+        [Fact]
         public void JavaScriptEngine_CanTransformInput()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -30,7 +29,7 @@ namespace IoTSharp.Test
             AssertHealthOutput(output);
         }
 
-        [TestMethod]
+        [Fact]
         public void PythonEngine_CanTransformInput()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -49,7 +48,7 @@ namespace IoTSharp.Test
             AssertHealthOutput(output);
         }
 
-        [TestMethod]
+        [Fact]
         public void LuaEngine_CanTransformInput()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -69,17 +68,17 @@ namespace IoTSharp.Test
             AssertHealthOutput(output);
         }
 
-        [TestMethod]
+        [Fact]
         public void CEngine_CanEvaluateExpression()
         {
             using var loggerFactory = CreateLoggerFactory();
             var engine = new CScriptEngine(loggerFactory.CreateLogger<CScriptEngine>(), CreateOptions());
 
             var output = engine.Do("2 + 3", "{}");
-            Assert.AreEqual(5, JsonSerializer.Deserialize<int>(output));
+            Assert.Equal(5, JsonSerializer.Deserialize<int>(output));
         }
 
-        [TestMethod]
+        [Fact]
         public void SqlEngine_CanQueryJsonPayload()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -90,10 +89,142 @@ namespace IoTSharp.Test
             var output = engine.Do(sql, input);
 
             using var document = JsonDocument.Parse(output);
-            Assert.AreEqual("female", document.RootElement[0].GetProperty("sex").GetString());
+            Assert.Equal("female", document.RootElement[0].GetProperty("sex").GetString());
         }
 
-        [TestMethod]
+        [Fact]
+        public void SqlEngine_CanQueryJsonPayload2()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "select sex from input where username=\"alice\"";
+            var input = "[{\"username\":\"bob\",\"sex\":\"male\"},{\"username\":\"alice\",\"sex\":\"female\"}]";
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("female", document.RootElement[0].GetProperty("sex").GetString());
+        }
+
+        [Fact]
+        public void SqlEngine_CanSelectDeepFieldsAndComputedValues()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "select profile.name as name, metrics.score + 5 as total from input where username = \"alice\"";
+            var input = """
+                [
+                  {"username":"bob","profile":{"name":"Bob"},"metrics":{"score":3}},
+                  {"username":"alice","profile":{"name":"Alice"},"metrics":{"score":7}}
+                ]
+                """;
+
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal(12, document.RootElement[0].GetProperty("total").GetInt32());
+        }
+
+        [Fact]
+        public void SqlEngine_CanSortByUnselectedFieldsWithMultipleColumns()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "select username from input order by priority descnum, profile.name asc limit 2";
+            var input = """
+                [
+                  {"username":"charlie","priority":2,"profile":{"name":"Charlie"}},
+                  {"username":"alice","priority":3,"profile":{"name":"Alice"}},
+                  {"username":"bob","priority":3,"profile":{"name":"Bob"}}
+                ]
+                """;
+
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("alice", document.RootElement[0].GetProperty("username").GetString());
+        }
+
+        [Fact]
+        public void SqlEngine_CanUpdateRowsUsingOrderByAndLimit()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "update input set status = \"done\", metrics.score = metrics.score + 1 order by priority descnum, created asc limit 1";
+            var input = """
+                [
+                  {"username":"alice","status":"new","priority":1,"created":2,"metrics":{"score":5}},
+                  {"username":"bob","status":"new","priority":3,"created":2,"metrics":{"score":9}},
+                  {"username":"charlie","status":"new","priority":3,"created":1,"metrics":{"score":4}}
+                ]
+                """;
+
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("done", document.RootElement[2].GetProperty("status").GetString());
+        }
+
+        [Fact]
+        public void SqlEngine_CanDeleteRowsUsingOrderByAndLimit()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "delete from input where status = \"obsolete\" order by created asc limit 1";
+            var input = """
+                [
+                  {"username":"alice","status":"obsolete","created":2},
+                  {"username":"bob","status":"obsolete","created":1},
+                  {"username":"charlie","status":"active","created":3}
+                ]
+                """;
+
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("alice", document.RootElement[0].GetProperty("username").GetString());
+        }
+
+        [Fact]
+        public void SqlEngine_CanUseInjectedMethods()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+            engine.RegisterMethod("tolower", args => args[0]?.ToString()?.ToLowerInvariant());
+
+            var sql = "select tolower(profile.name) as normalized from input where tolower(profile.name) = \"alice\"";
+            var input = """
+                [
+                  {"profile":{"name":"Bob"}},
+                  {"profile":{"name":"ALICE"}}
+                ]
+                """;
+
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("alice", document.RootElement[0].GetProperty("normalized").GetString());
+        }
+
+        [Fact]
+        public void SqlEngine_CanInsertRows()
+        {
+            using var loggerFactory = CreateLoggerFactory();
+            using var engine = new SQLEngine(loggerFactory.CreateLogger<SQLEngine>(), CreateOptions());
+
+            var sql = "insert into input set username = \"alice\", profile.name = \"Alice\", metrics.score = 9";
+            var input = "[]";
+            var output = engine.Do(sql, input);
+
+            using var document = JsonDocument.Parse(output);
+            Assert.Equal("Alice", document.RootElement[0].GetProperty("profile").GetProperty("name").GetString());
+        }
+
+        [Fact]
         public void CSharpEngine_CanReuseCompiledScript()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -119,7 +250,7 @@ namespace IoTSharp.Test
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void BasicEngine_ReturnsInputPayload()
         {
             using var loggerFactory = CreateLoggerFactory();
@@ -129,8 +260,8 @@ namespace IoTSharp.Test
             var output = engine.Do("ignored", input);
 
             using var document = JsonDocument.Parse(output);
-            Assert.AreEqual("device-001", document.RootElement.GetProperty("device").GetString());
-            Assert.IsTrue(document.RootElement.GetProperty("enabled").GetBoolean());
+            Assert.Equal("device-001", document.RootElement.GetProperty("device").GetString());
+            Assert.True(document.RootElement.GetProperty("enabled").GetBoolean());
         }
 
         private static IOptions<EngineSetting> CreateOptions()
@@ -142,8 +273,8 @@ namespace IoTSharp.Test
         private static void AssertHealthOutput(string output)
         {
             using var document = JsonDocument.Parse(output);
-            Assert.IsTrue(document.RootElement.GetProperty("fever").GetBoolean());
-            Assert.IsTrue(document.RootElement.GetProperty("fat").GetBoolean());
+            Assert.True(document.RootElement.GetProperty("fever").GetBoolean());
+            Assert.True(document.RootElement.GetProperty("fat").GetBoolean());
         }
     }
 }
