@@ -1,7 +1,7 @@
 using ClickHouse.Driver.ADO;
 using ClickHouse.EntityFrameworkCore.Extensions;
 using IoTSharp.Data;
-// using IoTSharp.Data.ClickHouse;
+using IoTSharp.Data.ClickHouse;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System;
