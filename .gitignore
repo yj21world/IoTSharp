@@ -33,8 +33,10 @@ bld/
 node_modules
 /dist
 iotsharp-frontend-latest
-
+Deployments/frontend/dist
+Deployments/output
 # local env files
+.env
 .env.local
 .env.*.local
 

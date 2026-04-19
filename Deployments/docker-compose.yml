@@ -1,0 +1,119 @@
+services:
+  pgsql:
+    image: timescale/timescaledb-ha:pg17
+    container_name: iotsharp-pgsql
+    restart: unless-stopped
+    volumes:
+      - pgsql_data:/var/lib/postgresql/data
+    environment:
+      TZ: "Asia/Shanghai"
+      POSTGRES_USER: postgres
+      POSTGRES_DB: IoTSharp
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iotsharp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: iotsharp-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iotsharp-network
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: iotsharp-rabbitmq
+    restart: unless-stopped
+    hostname: rabbitmq
+    environment:
+      TZ: "Asia/Shanghai"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - iotsharp-network
+
+  backend:
+    image: iotsharp-backend:latest
+    container_name: iotsharp-backend
+    restart: unless-stopped
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      TZ: "Asia/Shanghai"
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__IoTSharp: "Server=pgsql;Database=IoTSharp;Username=postgres;Password=${PG_PASSWORD};Pooling=true;MaxPoolSize=1024;"
+      ConnectionStrings__EventBusStore: "Server=pgsql;Database=IoTSharp;Username=postgres;Password=${PG_PASSWORD};Pooling=true;MaxPoolSize=1024;"
+      ConnectionStrings__TelemetryStorage: "Server=pgsql;Database=IoTSharp;Username=postgres;Password=${PG_PASSWORD};Pooling=true;MaxPoolSize=1024;"
+      ConnectionStrings__EventBusMQ: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      JwtKey: ${JWT_KEY}
+      CachingUseRedisHosts: "redis:6379"
+    volumes:
+      - ./backend/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - security_data:/app/security
+      - backend_data:/app/.data
+    ports:
+      - "8080:8080"
+      - "1883:1883"
+      - "8883:8883"
+      - "5683:5683/udp"
+      - "5684:5684/udp"
+      - "502:502"
+    networks:
+      - iotsharp-network
+
+  frontend:
+    image: iotsharp-frontend:latest
+    container_name: iotsharp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - iotsharp-network
+
+volumes:
+  pgsql_data:
+  redis_data:
+  rabbitmq_data:
+  security_data:
+  backend_data:
+
+networks:
+  iotsharp-network:
+    driver: bridge
