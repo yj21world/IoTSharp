@@ -32,7 +32,7 @@ bld/
 .DS_Store
 node_modules
 /dist
-
+iotsharp-frontend-latest
 
 # local env files
 .env.local
@@ -57,7 +57,6 @@ src/auto-imports.d.ts
 *.sw?
 package-lock.json
 /.eslintrc-auto-import.json
-<<<<<<< .mine
 #wwwroot/
 
 # Visual Studio 2017 auto generated files
@@ -403,7 +402,6 @@ ASALocalRun/
 /IoTSharp/TelemetryStorage.db-shm
 /IoTSharp/TelemetryStorage.db-wal
 package-lock.json
-=======
 
 
 
@@ -748,7 +746,6 @@ package-lock.json
 
 
 
->>>>>>> .theirs
 /ClientApp/.eslintrc-auto-import.json
 /ClientApp/src/auto-imports.d.ts
 /ClientApp/dist
