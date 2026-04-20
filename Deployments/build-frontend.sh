@@ -51,11 +51,11 @@ if [ ! -d "node_modules" ]; then
 fi
 
 echo "🔨 构建前端项目..."
-# npm run build
+npm run build
 
-# rm -rf "${DIST_DIR}"
-# mkdir -p "${DIST_DIR}"
-# cp -r "${CLIENT_DIR}/dist/"* "${DIST_DIR}/"
+rm -rf "${DIST_DIR}"
+mkdir -p "${DIST_DIR}"
+cp -r "${CLIENT_DIR}/dist/"* "${DIST_DIR}/"
 
 echo "✅ 前端构建完成: ${DIST_DIR}"
 
