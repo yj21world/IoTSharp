@@ -13,11 +13,11 @@ using Xunit;
 
 namespace IoTSharp.Test
 {
-    public sealed class ApiSmokeTests : IClassFixture<SqliteAppFixture>
+    public sealed class ApiSmokeTests : IClassFixture<PostgreSqlAppFixture>
     {
-        private readonly SqliteAppFixture _fixture;
+        private readonly PostgreSqlAppFixture _fixture;
 
-        public ApiSmokeTests(SqliteAppFixture fixture)
+        public ApiSmokeTests(PostgreSqlAppFixture fixture)
         {
             _fixture = fixture;
         }

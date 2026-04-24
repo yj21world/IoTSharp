@@ -2,6 +2,13 @@
 
 This package is part of the IoTSharp delivery set.
 
+Current HVAC-oriented runtime baseline:
+
+- Relational database: `PostgreSQL`
+- Event bus: `CAP`
+- Message broker: `RabbitMQ`
+- Time-series storage: `TimescaleDB` or `InfluxDB`
+
 ## What you get
 
 - Shared building blocks used by the IoTSharp platform and SDKs
@@ -19,7 +26,7 @@ This package is part of the IoTSharp delivery set.
 | Package | Purpose |
 | --- | --- |
 | `IoTSharp` | Main IoTSharp application package and deployment assets |
-| `IoTSharp.Data.JsonDB` | Query JSON payloads with SQL through an ADO.NET provider |
+| `IoTSharp.Data.JsonDB` | Query JSON payloads with SQL through an ADO.NET provider; retained because `IoTSharp.Interpreter` still depends on it |
 | `IoTSharp.Sdk.Http` | Access IoTSharp APIs over HTTP |
 | `IoTSharp.Sdk.MQTT` | Connect devices and services to IoTSharp over MQTT |
 | `IoTSharp.Extensions.*` | Reusable extension packages for ASP.NET Core, DI, EF Core, Quartz, REST, and crypto features |

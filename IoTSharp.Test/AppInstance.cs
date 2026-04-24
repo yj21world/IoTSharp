@@ -50,24 +50,26 @@ namespace IoTSharp.Test
 
         protected virtual Task DisposeTestResourcesAsync() => Task.CompletedTask;
 
-        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, DataBaseType dbType) =>
-            await InitializeApplicationAsync(dbMain, dbTelemetry, dbType, TelemetryStorage.Sharding, EventBusStore.InMemory);
+        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, string eventBusMq, DataBaseType dbType) =>
+            await InitializeApplicationAsync(dbMain, dbTelemetry, eventBusMq, dbType, TelemetryStorage.TimescaleDB, EventBusStore.PostgreSql);
 
-        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, DataBaseType dbType, TelemetryStorage telemetry) =>
-            await InitializeApplicationAsync(dbMain, dbTelemetry, dbType, telemetry, EventBusStore.InMemory);
+        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, string eventBusMq, DataBaseType dbType, TelemetryStorage telemetry) =>
+            await InitializeApplicationAsync(dbMain, dbTelemetry, eventBusMq, dbType, telemetry, EventBusStore.PostgreSql);
 
-        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, DataBaseType dbType, TelemetryStorage telemetry, EventBusStore eventBus)
+        protected async Task InitializeApplicationAsync(string dbMain, string dbTelemetry, string eventBusMq, DataBaseType dbType, TelemetryStorage telemetry, EventBusStore eventBus)
         {
             Host = await AlbaHost.For<IoTSharp.Program>(builder =>
             {
                 builder.UseEnvironment("Test");
                 builder.UseSetting("DataBase", Enum.GetName(dbType));
                 builder.UseSetting("EventBusStore", Enum.GetName(eventBus));
-                builder.UseSetting("EventBusMQ", Enum.GetName(EventBusMQ.InMemory));
+                builder.UseSetting("EventBusMQ", Enum.GetName(EventBusMQ.RabbitMQ));
                 builder.UseSetting("TelemetryStorage", Enum.GetName(telemetry));
                 builder.UseSetting("EventBus", Enum.GetName(EventBusFramework.CAP));
                 builder.UseSetting("ConnectionStrings:IoTSharp", dbMain);
                 builder.UseSetting("ConnectionStrings:TelemetryStorage", dbTelemetry);
+                builder.UseSetting("ConnectionStrings:EventBusStore", dbMain);
+                builder.UseSetting("ConnectionStrings:EventBusMQ", eventBusMq);
             });
 
             using var client = Host.GetTestClient();

@@ -2,6 +2,7 @@
 services:
   pgsql:
     image: timescale/timescaledb-ha:pg17
+    container_name: iotsharp-dev-pgsql
     volumes:
       - "./data/postgresql:/var/lib/postgresql"
     environment:
@@ -14,28 +15,23 @@ services:
     networks:
       - iotsharp-network
  
-  iotsharp:
-    image: maikebing/iotsharp
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: iotsharp-dev-rabbitmq
+    hostname: rabbitmq
     environment:
-      TZ: Asia/Shanghai
-    depends_on:
-      - pgsql
-    links:
-      - pgsql
+      TZ: "Asia/Shanghai"
+      RABBITMQ_DEFAULT_USER: iotsharp
+      RABBITMQ_DEFAULT_PASS: BrrveCFVAZ6kM6vhjFMd
     volumes:
-      - "./appsettings.Development.json:/app/appsettings.Development.json"
-      - ./data/security:/app/security
+      - "./data/rabbitmq:/var/lib/rabbitmq"
     ports:
-      - 2927:8080
-      - 1883:1883
-      - 8883:8883 
-      - 5683:5683
-      - 5684:5684
-      - 502:502
+      - "5672:5672"
+      - "15672:15672"
     networks:
       - iotsharp-network
-        
-      
+
+
 
 networks: 
   iotsharp-network:

@@ -17,7 +17,6 @@ using Jdenticon.AspNetCore;
 using Jdenticon.Rendering;
 using LettuceEncrypt;
 using LettuceEncrypt.Dns.Ali;
-using MaiKeBing.HostedService.ZeroMQ;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -83,40 +82,8 @@ namespace IoTSharp
                         .ForEach(f => dso.AddDrive(f));
                 }, name: "Disk Storage");
 
-            switch (settings.DataBase)
-            {
-                case DataBaseType.MySql:
-                    services.ConfigureMySql(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    break;
-
-                case DataBaseType.SqlServer:
-                    services.ConfigureSqlServer(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    break;
-
-                case DataBaseType.Oracle:
-                    services.ConfigureOracle(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    break;
-
-                case DataBaseType.Sqlite:
-                    services.ConfigureSqlite(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    break;
-                case DataBaseType.InMemory:
-                    services.ConfigureInMemory(settings.DbContextPoolSize, healthChecksUI);
-                    settings.TelemetryStorage = TelemetryStorage.SingleTable;
-                    break;
-                case DataBaseType.Cassandra:
-                    services.ConfigureCassandra(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    settings.TelemetryStorage = TelemetryStorage.SingleTable;
-                    break;
-                // case DataBaseType.ClickHouse:
-                //     services.ConfigureClickHouse(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                //     settings.TelemetryStorage = TelemetryStorage.SingleTable;
-                //     break;
-                case DataBaseType.PostgreSql:
-                default:
-                    services.ConfigureNpgsql(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
-                    break;
-            }
+            ValidateRuntimeSettings(settings);
+            services.ConfigureNpgsql(Configuration.GetConnectionString("IoTSharp"), settings.DbContextPoolSize, healthChecks, healthChecksUI);
             services.AddDatabaseDeveloperPageExceptionFilter();
             services.AddIdentity<IdentityUser, IdentityRole>()
                 .AddRoles<IdentityRole>()
@@ -204,7 +171,6 @@ namespace IoTSharp
                             config.SerializerName = "json";
                         }, _hc_Caching);
                         options.WithJson("json");
-                        healthChecks.AddRedis(settings.CachingUseRedisHosts, name: _hc_Caching);
                         break;
 
                     case CachingUseIn.LiteDB:
@@ -218,26 +184,13 @@ namespace IoTSharp
                 }
             });
             services.AddTelemetryStorage(settings, healthChecks);
-            var zmq = Configuration.GetSection(nameof(ZMQOption)).Get<ZMQOption>();
-            if (zmq != null)
-            {
-                services.AddHostedZeroMQ(cfg => cfg = zmq);
-            }
             services.AddEventBus(opt =>
             {
                 opt.AppSettings = settings;
                 opt.EventBusStore = Configuration.GetConnectionString("EventBusStore");
                 opt.EventBusMQ = Configuration.GetConnectionString("EventBusMQ");
                 opt.HealthChecks = healthChecks;
-                switch (settings.EventBus)
-                {
-                    case EventBusFramework.Shashlik:
-                        throw new NotSupportedException(" EventBusFramework.Shashlik is not supported yet");
-                    case EventBusFramework.CAP:
-                    default:
-                        opt.UserCAP();
-                        break;
-                }
+                opt.UserCAP();
             });
             services.AddHostedService<CoAPService>();
             services.AddScoped<CollectionTaskService>();
@@ -291,6 +244,34 @@ namespace IoTSharp
              .WithPromptsFromAssembly()
              .WithResourcesFromAssembly()
                 .WithToolsFromAssembly();
+        }
+
+        private static void ValidateRuntimeSettings(AppSettings settings)
+        {
+            if (settings.DataBase != DataBaseType.PostgreSql)
+            {
+                throw new NotSupportedException($"当前仅支持关系数据库 PostgreSql，收到配置值: {settings.DataBase}");
+            }
+
+            if (settings.EventBus != EventBusFramework.CAP)
+            {
+                throw new NotSupportedException($"当前仅支持事件总线框架 CAP，收到配置值: {settings.EventBus}");
+            }
+
+            if (settings.EventBusStore != EventBusStore.PostgreSql)
+            {
+                throw new NotSupportedException($"当前仅支持事件总线存储 PostgreSql，收到配置值: {settings.EventBusStore}");
+            }
+
+            if (settings.EventBusMQ != EventBusMQ.RabbitMQ)
+            {
+                throw new NotSupportedException($"当前仅支持消息中间件 RabbitMQ，收到配置值: {settings.EventBusMQ}");
+            }
+
+            if (settings.TelemetryStorage != TelemetryStorage.TimescaleDB && settings.TelemetryStorage != TelemetryStorage.InfluxDB)
+            {
+                throw new NotSupportedException($"当前仅支持时序存储 TimescaleDB 或 InfluxDB，收到配置值: {settings.TelemetryStorage}");
+            }
         }
 
 

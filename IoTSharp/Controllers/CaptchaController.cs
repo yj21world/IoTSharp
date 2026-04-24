@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Reflection;
 
 namespace IoTSharp.Controllers
 {
@@ -22,6 +23,15 @@ namespace IoTSharp.Controllers
     [Route("api/[controller]/[action]")]
     public class CaptchaController : ControllerBase
     {
+        private static readonly Assembly CaptchaAssembly = typeof(CaptchaController).Assembly;
+        private static readonly string BuzzleTemplateResourceName = "IoTSharp.Resources.buzzle-template.png";
+        private static readonly string[] SlideResourceNames = CaptchaAssembly
+            .GetManifestResourceNames()
+            .Where(name => name.StartsWith("IoTSharp.Resources.slide", StringComparison.OrdinalIgnoreCase)
+                && name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         private readonly IEasyCachingProvider _caching;
         private readonly IWebHostEnvironment _hostingEnvironment;
 
@@ -67,7 +77,7 @@ namespace IoTSharp.Controllers
         [HttpGet, AllowAnonymous]
         public FileStreamResult Imgs()
         {
-            var orginfile = typeof(CaptchaController).Assembly.GetManifestResourceStream($"IoTSharp.Resources.slide{RandomNumberGenerator.GetInt32(1, 15)}.jpg");
+            var orginfile = OpenSlideResourceStream();
             return File(orginfile, "image/jpeg");
         }
 
@@ -104,12 +114,16 @@ namespace IoTSharp.Controllers
 
         private ModelCaptcha CreateImage()
         {
-            using var buzzlefile = typeof(CaptchaController).Assembly.GetManifestResourceStream("IoTSharp.Resources.buzzle-template.png");
-            using var orginfile = typeof(CaptchaController).Assembly.GetManifestResourceStream($"IoTSharp.Resources.slide{RandomNumberGenerator.GetInt32(1, 15)}.jpg");
+            using var buzzlefile = OpenRequiredResourceStream(BuzzleTemplateResourceName);
+            using var orginfile = OpenSlideResourceStream();
             using var buzzlefilestream = new SKManagedStream(buzzlefile);
             using var orginfilestream = new SKManagedStream(orginfile);
             using var buzzle = SKBitmap.Decode(buzzlefilestream);
             using var original = SKBitmap.Decode(orginfilestream);
+            if (buzzle == null || original == null)
+            {
+                throw new InvalidOperationException("验证码图片资源加载失败，请检查嵌入资源配置。");
+            }
             int buzzleWidth = buzzle.Width;
             int buzzleHeight = buzzle.Height;
             int oriImageWidth = original.Width;
@@ -117,6 +131,28 @@ namespace IoTSharp.Controllers
             int randomlocaltionx = RandomNumberGenerator.GetInt32(oriImageWidth - 2 * buzzleWidth) + buzzleWidth;
             int randomlocaltiony = RandomNumberGenerator.GetInt32(oriImageHeight - buzzleHeight);
             return Cut(original, buzzle, randomlocaltionx, randomlocaltiony, buzzleWidth, buzzleHeight);
+        }
+
+        private static Stream OpenSlideResourceStream()
+        {
+            if (SlideResourceNames.Length == 0)
+            {
+                throw new InvalidOperationException("未找到验证码背景图嵌入资源，请检查 IoTSharp.Resources.slide*.jpg。");
+            }
+
+            string resourceName = SlideResourceNames[RandomNumberGenerator.GetInt32(SlideResourceNames.Length)];
+            return OpenRequiredResourceStream(resourceName);
+        }
+
+        private static Stream OpenRequiredResourceStream(string resourceName)
+        {
+            Stream stream = CaptchaAssembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+            {
+                throw new InvalidOperationException($"未找到嵌入资源: {resourceName}");
+            }
+
+            return stream;
         }
 
         private SKColor CaclAvg(SKColor[][] matrix)

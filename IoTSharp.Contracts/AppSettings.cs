@@ -13,36 +13,18 @@ namespace IoTSharp.Contracts
     [JsonConverter(typeof(StringEnumConverter))]
     public enum TelemetryStorage
     {
-        SingleTable,
-        Sharding,
-        Taos,
         InfluxDB,
-        PinusDB,
-        TimescaleDB,
-        IoTDB
+        TimescaleDB
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum EventBusStore
     {
-        PostgreSql,
-        MongoDB,
-        InMemory,
-        LiteDB,
-        MySql,
-        SqlServer
+        PostgreSql
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum EventBusMQ
     {
-        RabbitMQ,
-        Kafka,
-        InMemory,
-        ZeroMQ,
-        NATS,
-        Pulsar,
-        RedisStreams,
-        AmazonSQS,
-        AzureServiceBus
+        RabbitMQ
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum CachingUseIn
@@ -56,8 +38,7 @@ namespace IoTSharp.Contracts
     [JsonConverter(typeof(StringEnumConverter))]
     public enum EventBusFramework
     {
-        CAP,
-        Shashlik,
+        CAP
     }
     public class AppSettings
     {
@@ -80,11 +61,11 @@ namespace IoTSharp.Contracts
 
         public ModBusServerSetting ModBusServer { get; set; } = new ModBusServerSetting();
 
-        public TelemetryStorage TelemetryStorage { get; set; } = TelemetryStorage.SingleTable;
+        public TelemetryStorage TelemetryStorage { get; set; } = TelemetryStorage.TimescaleDB;
 
 
-        public EventBusStore EventBusStore { get; set; } = EventBusStore.InMemory;
-        public EventBusMQ EventBusMQ { get; set; } = EventBusMQ.InMemory;
+        public EventBusStore EventBusStore { get; set; } = EventBusStore.PostgreSql;
+        public EventBusMQ EventBusMQ { get; set; } = EventBusMQ.RabbitMQ;
         public int ConsumerThreadCount { get; set; } = Environment.ProcessorCount;
         public int DbContextPoolSize { get; set; } = 128;
         public CachingUseIn CachingUseIn { get; set; } = CachingUseIn.InMemory;

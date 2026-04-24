@@ -221,14 +221,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\IoTSharp.Contracts\IoTSharp.Contracts.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.Cassandra\IoTSharp.Data.Cassandra.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.ClickHouse\IoTSharp.Data.ClickHouse.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.InMemory\IoTSharp.Data.InMemory.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.MySQL\IoTSharp.Data.MySQL.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.Oracle\IoTSharp.Data.Oracle.csproj" />
 		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.PostgreSQL\IoTSharp.Data.PostgreSQL.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.Sqlite\IoTSharp.Data.Sqlite.csproj" />
-		<ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.SqlServer\IoTSharp.Data.SqlServer.csproj" />
 		<ProjectReference Include="..\IoTSharp.Data.TimeSeries\IoTSharp.Data.TimeSeries.csproj" />
 		<ProjectReference Include="..\IoTSharp.Data\IoTSharp.Data.csproj" />
 		<ProjectReference Include="..\IoTSharp.EventBus.CAP\IoTSharp.EventBus.CAP.csproj" />

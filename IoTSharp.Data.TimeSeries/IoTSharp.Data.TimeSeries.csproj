@@ -6,22 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 	<ItemGroup>
-
-		<PackageReference Include="Apache.IoTDB.Data" Version="2.0.2" />
-		<PackageReference Include="IoTSharp.Data.Taos" Version="3.0.21.90" />
 		<PackageReference Include="DotNetDiag.HealthChecks.InfluxDB" Version="10.0.4" />
-		<PackageReference Include="IoTSharp.HealthChecks.IoTDB" Version="10.0.1" />
 		<PackageReference Include="hyjiacan.pinyin4net" Version="4.1.1" />
-		<PackageReference Include="IoTSharp.HealthChecks.Taos" Version="3.0.21.90" />
 		<PackageReference Include="InfluxDB.Client" Version="5.0.0" />
 	</ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IoTSharp.Contracts\IoTSharp.Contracts.csproj" />
-    <ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.MySQL\IoTSharp.Data.MySQL.csproj" />
-    <ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.Oracle\IoTSharp.Data.Oracle.csproj" />
     <ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.PostgreSQL\IoTSharp.Data.PostgreSQL.csproj" />
-    <ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.Sqlite\IoTSharp.Data.Sqlite.csproj" />
-    <ProjectReference Include="..\IoTSharp.Data.Storage\IoTSharp.Data.SqlServer\IoTSharp.Data.SqlServer.csproj" />
     <ProjectReference Include="..\IoTSharp.Data\IoTSharp.Data.csproj" />
     <ProjectReference Include="..\IoTSharp.Extensions.DependencyInjection\IoTSharp.Extensions.DependencyInjection.csproj" />
     <ProjectReference Include="..\IoTSharp.Extensions.EFCore\IoTSharp.Extensions.EFCore.csproj" />

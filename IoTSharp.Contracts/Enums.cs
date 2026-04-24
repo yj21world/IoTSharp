@@ -239,14 +239,7 @@ namespace IoTSharp.Contracts
     [JsonConverter(typeof(StringEnumConverter))]
     public enum DataBaseType
     {
-        PostgreSql,
-        SqlServer,
-        MySql,
-        Oracle,
-        Sqlite,
-        InMemory,
-        Cassandra,
-        ClickHouse
+        PostgreSql
     }
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     [JsonConverter(typeof(StringEnumConverter))]

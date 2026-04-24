@@ -2,7 +2,6 @@
 using IoTSharp.Contracts;
 using IoTSharp.Data;
 using IoTSharp.Dtos;
-using MongoDB.Bson.Serialization.Serializers;
 
 namespace IoTSharp.Models
 {

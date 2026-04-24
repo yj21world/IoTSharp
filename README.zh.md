@@ -26,7 +26,7 @@ IoTSharp 将构建生产级 IoT 平台所需的关键能力组合在一起：
 - 支持 HTTP、MQTT、CoAP 等协议的设备与网关接入能力。
 - 围绕遥测、属性、告警、产品、资产和租户形成统一的数据与管理模型。
 - 通过规则链完成数据转换、通知下发、自动化动作和业务处理。
-- 支持关系型数据库与时序数据库，以适配不同部署和扩展场景。
+- 当前产品化运行时基线固定为 `PostgreSQL + CAP + RabbitMQ + TimescaleDB/InfluxDB`。
 - 提供 Docker、Windows 服务、Linux 服务、安装向导与发布包等多种交付方式。
 
 当前主应用基于 `.NET 10`，Web 控制台基于 Vue 3，并已全面统一为 IoTSharp 品牌界面。
@@ -46,23 +46,14 @@ IoTSharp 将构建生产级 IoT 平台所需的关键能力组合在一起：
 
 - 前端：`http://localhost:27915`
 
-### 🤖 使用 OpenClaw 协助搭建 SQLite 体验实例
-
-如果你希望让 OpenClaw 引导你完成本地 SQLite 版 IoTSharp 的安装，建议直接给它下面这两样内容：
-
-- <https://iotsharp.net/docs/operations/openclaw-sqlite-runbook>
-- 提示词模板：[`tools/prompts/openclaw-sqlite-instance.txt`](tools/prompts/openclaw-sqlite-instance.txt)
-
-运行手册里已经定义了 SQLite 引导流程、安装向导初始化路径、Docker Desktop 扩展的回退方案，以及后续通过 `appsettings.{Environment}.Installer.json` 安全切换数据库的规则。
-
 ## 🧩 支持的组件
 
 | 领域 | 概览 |
 | --- | --- |
 | 接入能力 | 面向工业场景的设备接入、网关接入与协议扩展能力 |
 | 平台模型 | 遥测、属性、告警、产品、资产、租户与用户等核心模型 |
-| 数据基础 | 关系型存储、时序存储，以及安装阶段可选的配置模板体系 |
-| 集成处理 | 规则链、脚本、通知、事件传递与自动化动作 |
+| 数据基础 | PostgreSQL 关系库存储，TimescaleDB / InfluxDB 时序存储 |
+| 集成处理 | 规则链、脚本、CAP 事件总线、RabbitMQ 消息传递与自动化动作 |
 | 交付方式 | Docker、系统服务、安装向导与 Docker Desktop 扩展等形态 |
 
 如果你需要更细的数据库矩阵、时序引擎、消息中间件支持和配置示例，请直接查看文档：
@@ -91,7 +82,6 @@ IoTSharp 将构建生产级 IoT 平台所需的关键能力组合在一起：
 - [`ClientApp`](ClientApp)：Vue 3 前端控制台。
 - [`docs`](docs)：Docusaurus 帮助手册站点。
 - [`docker-desktop-extension`](docker-desktop-extension)：Docker Desktop 扩展体验包。
-- [`IoTSharp.Installer.Windows`](IoTSharp.Installer.Windows)：Windows 安装工程。
 - [`IoTSharp.Agent`](IoTSharp.Agent)：桌面托盘代理项目。
 - [`IoTSharp.SDKs`](IoTSharp.SDKs)：SDK 与面向客户端的相关项目。
 

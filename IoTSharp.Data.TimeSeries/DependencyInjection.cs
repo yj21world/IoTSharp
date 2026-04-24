@@ -1,18 +1,9 @@
-﻿using IoTSharp.Contracts;
-using IoTSharp.Data.Shardings;
+using InfluxDB.Client;
+using IoTSharp.Contracts;
 using IoTSharp.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ShardingCore;
-using IoTSharp.Data.Shardings.Routes;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.ObjectPool;
-using IoTSharp.Data.Taos;
-using InfluxDB.Client;
+using System;
 
 namespace IoTSharp.Data.TimeSeries
 {
@@ -20,97 +11,23 @@ namespace IoTSharp.Data.TimeSeries
     {
         public static void AddTelemetryStorage(this IServiceCollection services, AppSettings settings, IHealthChecksBuilder healthChecks)
         {
-            string _hc_telemetryStorage = $"{nameof(TelemetryStorage)}-{Enum.GetName(settings.TelemetryStorage)}";
-            var _connectionString = settings.ConnectionStrings["TelemetryStorage"];
+            string healthCheckName = $"{nameof(TelemetryStorage)}-{Enum.GetName(settings.TelemetryStorage)}";
+            string connectionString = settings.ConnectionStrings["TelemetryStorage"];
+
             switch (settings.TelemetryStorage)
             {
-                case TelemetryStorage.Sharding:
-                    ShardingByDateMode settingsShardingByDateMode = settings.ShardingByDateMode;
-                    var _sharding = services.AddShardingDbContext<ShardingDbContext>();
-                    _sharding.UseRouteConfig(o =>
-                    {
-                        switch (settingsShardingByDateMode)
-                        {
-                            case ShardingByDateMode.PerMinute:
-                                o.AddShardingTableRoute<TelemetryDataMinuteRoute>();
-                                break;
-                            case ShardingByDateMode.PerHour:
-                                o.AddShardingTableRoute<TelemetryDataHourRoute>();
-                                break;
-                            case ShardingByDateMode.PerDay:
-                                o.AddShardingTableRoute<TelemetryDataDayRoute>();
-                                break;
-                            case ShardingByDateMode.PerMonth:
-                                o.AddShardingTableRoute<TelemetryDataMonthRoute>();
-                                break;
-                            case ShardingByDateMode.PerYear:
-                                o.AddShardingTableRoute<TelemetryDataYearRoute>();
-                                break;
-                            default: throw new InvalidOperationException($"unknown sharding mode:{settingsShardingByDateMode}");
-                        }
-                    });
-                    _sharding.UseConfig(o =>
-                    {
-                        o.ThrowIfQueryRouteNotMatch = false;
-                        o.UseShellDbContextConfigure(builder => builder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
-                        o.AddDefaultDataSource("ds0", _connectionString);
-                        switch (settings.DataBase)
-                        {
-                            case DataBaseType.MySql:
-                                o.UseMySqlToSharding();
-                                break;
-
-                            case DataBaseType.SqlServer:
-                                o.UseSqlServerToSharding();
-                                break;
-
-                            case DataBaseType.Oracle:
-                                o.UseOracleToSharding();
-                                break;
-
-                            case DataBaseType.Sqlite:
-                                o.UseSQLiteToSharding();
-                                break;
-                            case DataBaseType.PostgreSql:
-                            default:
-                                o.UseNpgsqlToSharding();
-                                break;
-                        }
-                    });
-                    _sharding.AddShardingCore();
-                    services.AddSingleton<IStorage, ShardingStorage>();
-                    break;
-
-                case TelemetryStorage.Taos:
-                    services.AddSingleton<IStorage, TaosStorage>();
-                    healthChecks.AddTDengine(new TaosConnectionStringBuilder(_connectionString).UseRESTful().ConnectionString, name: _hc_telemetryStorage);
-                    break;
                 case TelemetryStorage.InfluxDB:
-                    //https://github.com/julian-fh/influxdb-setup
                     services.AddSingleton<IStorage, InfluxDBStorage>();
-                    //"TelemetryStorage": "http://localhost:8086/?org=iotsharp&bucket=iotsharp-bucket&token=iotsharp-token"
-                    services.AddObjectPool(() => new InfluxDBClient(InfluxDBClientOptions.Builder.CreateNew().ConnectionString(_connectionString).Build()));
-                    healthChecks.AddInfluxDB(_connectionString, name: _hc_telemetryStorage);
+                    services.AddObjectPool(() => new InfluxDBClient(InfluxDBClientOptions.Builder.CreateNew().ConnectionString(connectionString).Build()));
+                    healthChecks.AddInfluxDB(connectionString, name: healthCheckName);
                     break;
 
-                case TelemetryStorage.PinusDB:
-                    throw new NotSupportedException("PinusDB is not supported yet");
                 case TelemetryStorage.TimescaleDB:
                     services.AddSingleton<IStorage, TimescaleDBStorage>();
                     break;
-                case TelemetryStorage.IoTDB:
-                    var str = _connectionString;
-                    services.AddSingleton<IStorage, IoTDBStorage>();
-                    services.AddSingleton(s =>
-                    {
-                        return new Apache.IoTDB.Data.IoTDBConnection(str);
-                    });
-                    healthChecks.AddIoTDB(str);
-                    break;
-                case TelemetryStorage.SingleTable:
+
                 default:
-                    services.AddSingleton<IStorage, EFStorage>();
-                    break;
+                    throw new NotSupportedException($"当前仅支持时序存储 TimescaleDB 或 InfluxDB，收到配置值: {settings.TelemetryStorage}");
             }
         }
     }

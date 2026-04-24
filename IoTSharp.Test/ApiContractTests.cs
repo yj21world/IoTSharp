@@ -13,11 +13,11 @@ using Xunit;
 
 namespace IoTSharp.Test
 {
-    public sealed class ApiContractTests : IClassFixture<SqliteAppFixture>
+    public sealed class ApiContractTests : IClassFixture<PostgreSqlAppFixture>
     {
-        private readonly SqliteAppFixture _fixture;
+        private readonly PostgreSqlAppFixture _fixture;
 
-        public ApiContractTests(SqliteAppFixture fixture)
+        public ApiContractTests(PostgreSqlAppFixture fixture)
         {
             _fixture = fixture;
         }
