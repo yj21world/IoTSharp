@@ -178,10 +178,11 @@ export function dynamicImport(dynamicViewsModules: Record<string, Function>, com
 }
 function transformItem(source: any[], target: any[]) {
 	for (let item of source) {
+		const componentPath = resolveComponentPath(item);
 		let newItem: any = {
 			path: item.vpath,
 			name: item.routename,
-			component: item.vpath,
+			component: componentPath,
 			meta: {
 				title: item.text,
 				isLink: '',
@@ -199,4 +200,15 @@ function transformItem(source: any[], target: any[]) {
 			transformItem(item.children, newItem.children);
 		}
 	}
+}
+
+function resolveComponentPath(item: any) {
+	const routeName = item?.routename as string;
+	const componentMap: Record<string, string> = {
+		collectiontasklist: '/iot/collectiontask/collectiontasklist',
+	};
+	if (routeName && componentMap[routeName]) {
+		return componentMap[routeName];
+	}
+	return item.vpath;
 }

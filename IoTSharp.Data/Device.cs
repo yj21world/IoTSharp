@@ -51,5 +51,20 @@ namespace IoTSharp.Data
 
         public bool Deleted { get; set; }
 
+        /// <summary>
+        /// HVAC 设备类型（可选）
+        /// </summary>
+        public HVACDeviceType? HvacDeviceType { get; set; }
+
+        /// <summary>
+        /// 绑定的设备类型模板ID
+        /// </summary>
+        public Guid? DeviceTypeProfileId { get; set; }
+
+        /// <summary>
+        /// 导航属性：设备类型模板
+        /// </summary>
+        public DeviceTypeProfile DeviceTypeProfile { get; set; }
+
     }
 }

@@ -115,6 +115,24 @@ export const frontEndRoutes: Array<RouteRecordRaw> = [
 			isHide: true,
 		},
 	},
+	{
+		path: '/iot/collection/collectiontasklist',
+		name: 'collectiontasklist',
+		component: () => import('/@/views/iot/collectiontask/collectiontasklist.vue'),
+		meta: {
+			title: '采集任务',
+			isHide: true,
+		},
+	},
+	{
+		path: '/iot/devicetypeprofile/devicetypeprofilelist',
+		name: 'devicetypeprofilelist',
+		component: () => import('/@/views/iot/devicetypeprofile/devicetypeprofilelist.vue'),
+		meta: {
+			title: '设备类型模板',
+			isHide: true,
+		},
+	},
 ];
 
 export const notFoundAndNoPower: Array<RouteRecordRaw> = [

@@ -15,6 +15,7 @@ using Newtonsoft.Json.Linq;
 using IoTSharp.Contracts;
 using System.Net.Security;
 using System.Diagnostics;
+using System.Buffers;
 
 namespace IoTSharp
 {
@@ -160,15 +161,17 @@ namespace IoTSharp
         }
         public static async Task PublishAsync<T>(this MqttServer mqtt, string SenderClientId, string topic, T _payload) where T : class
         {
-            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, PayloadSegment = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_payload) });
+            var payload = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_payload);
+            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, Payload = new ReadOnlySequence<byte>(payload) });
         }
         public static async Task PublishAsync(this MqttServer mqtt, string SenderClientId, string topic, string _payload)
         {
-            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, PayloadSegment = System.Text.Encoding.Default.GetBytes(_payload) });
+            var payload = System.Text.Encoding.Default.GetBytes(_payload);
+            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, Payload = new ReadOnlySequence<byte>(payload) });
         }
         public static async Task PublishAsync(this MqttServer mqtt, string SenderClientId, string topic, byte[] _payload)
         {
-            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, PayloadSegment = _payload });
+            await mqtt.PublishAsync(SenderClientId, new MqttApplicationMessage() { Topic = topic, Payload = new ReadOnlySequence<byte>(_payload) });
         }
 
         public static async Task PublishAsync(this MqttServer mqtt, string SenderClientId, MqttApplicationMessage message)

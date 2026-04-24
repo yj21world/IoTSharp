@@ -10,6 +10,7 @@ using IoTSharp.FlowRuleEngine;
 using IoTSharp.Gateways;
 using IoTSharp.Interpreter;
 using IoTSharp.McpTools;
+using IoTSharp.Extensions;
 using IoTSharp.Services;
 using IoTSharp.TaskActions;
 using Jdenticon.AspNetCore;
@@ -239,6 +240,9 @@ namespace IoTSharp
                 }
             });
             services.AddHostedService<CoAPService>();
+            services.AddScoped<CollectionTaskService>();
+            services.AddScoped<DeviceTypeProfileService>();
+            services.AddModbusCollection();
             services.AddTransient(_ => StorageFactory.Blobs.FromConnectionString(Configuration.GetConnectionString("BlobStorage") ?? $"disk://path={Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.Create)}/IoTSharp/"));
 
             services.AddControllers().AddNewtonsoftJson(options =>

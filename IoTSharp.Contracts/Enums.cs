@@ -289,6 +289,42 @@ namespace IoTSharp.Contracts
         CanOpen,
     }
 
+    /// <summary>
+    /// HVAC 设备类型枚举
+    /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum HVACDeviceType
+    {
+        Unknown = 0,
+
+        // 冷热源
+        Chiller = 1,           // 冷水机组
+        HeatPump = 2,          // 热泵机组
+
+        // 水系统
+        WaterPump = 10,         // 水泵
+        CoolingTower = 11,     // 冷却塔
+
+        // 末端
+        AirHandlingUnit = 20,  // 风柜 (AHU)
+        FanCoilUnit = 21,      // 风机盘管 (FCU)
+
+        // 部件
+        Valve = 30,             // 阀门
+        Damper = 31,           // 风阀
+        Fan = 32,              // 风机
+
+        // 计量
+        PowerMeter = 40,       // 电表
+        FlowMeter = 41,         // 流量计
+
+        // 传感器
+        TemperatureSensor = 50, // 温度传感器
+        HumiditySensor = 51,   // 湿度传感器
+        PressureSensor = 52,    // 压力传感器
+    }
+
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     [JsonConverter(typeof(StringEnumConverter))]
     public enum CoApRes

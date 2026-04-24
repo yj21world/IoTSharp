@@ -36,6 +36,12 @@ namespace IoTSharp.Data
             builder_options.Infrastructure = this;
             builder_options.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfiguration(new TelemetryDataConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionTaskConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionDeviceConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPointConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionLogConfiguration());
+            modelBuilder.ApplyConfiguration(new DeviceTypeProfileConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionRuleTemplateConfiguration());
             base.OnModelCreating(modelBuilder);
         }
 
@@ -96,6 +102,13 @@ namespace IoTSharp.Data
         public DbSet<ProduceDataMapping> ProduceDataMappings { get; set; }
 
         public DbSet<AISettings> AISettings { get; set; }
+
+        public DbSet<CollectionTask> CollectionTasks { get; set; }
+        public DbSet<CollectionDevice> CollectionDevices { get; set; }
+        public DbSet<CollectionPoint> CollectionPoints { get; set; }
+        public DbSet<CollectionLog> CollectionLogs { get; set; }
+        public DbSet<DeviceTypeProfile> DeviceTypeProfiles { get; set; }
+        public DbSet<CollectionRuleTemplate> CollectionRuleTemplates { get; set; }
     }
 
 }
