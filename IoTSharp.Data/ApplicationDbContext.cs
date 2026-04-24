@@ -76,18 +76,6 @@ namespace IoTSharp.Data
         public DbSet<SubscriptionTask> SubscriptionTasks { get; set; }
         public DbSet<SubscriptionEvent> SubscriptionEvents { get; set; }
 
-        public DbSet<DeviceDiagram> DeviceDiagrams { get; set; }
-
-        public DbSet<DeviceGraph> DeviceGraphs { get; set; }
-
-        public DbSet<DeviceGraphToolBox> DeviceGraphToolBoxes { get; set; }
-
-        public DbSet<DevicePort> DevicePorts { get; set; }
-        public DbSet<DevicePortMapping> DevicePortMappings { get; set; }
-
-        public DbSet<DeviceModel> DeviceModels { get; set; }
-        public DbSet<DeviceModelCommand> DeviceModelCommands { get; set; }
-
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         public DbSet<Alarm> Alarms { get; set; }

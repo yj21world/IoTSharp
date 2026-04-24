@@ -403,6 +403,7 @@ ASALocalRun/
 /IoTSharp/IoTSharp.db-wal
 /IoTSharp/TelemetryStorage.db-shm
 /IoTSharp/TelemetryStorage.db-wal
+/IoTSharp/IoTSharp.xml
 package-lock.json
 
 

@@ -41,7 +41,6 @@
 		<PackageIcon>96x96.png</PackageIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
-		<DocumentationFile>IoTSharp.xml</DocumentationFile>
 		<NoWarn>1701;1702;1591</NoWarn>
 		<EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
 		<Configurations>Debug;Release;</Configurations>
@@ -115,9 +114,6 @@
 
 
 	<ItemGroup>
-		<Content Include="IoTSharp.xml">
-			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
-		</Content>
 		<None Include="..\ClientApp\public\96x96.png" Pack="true" PackagePath="\" Visible="false" />
 		<Content Include="iotsharp.service" CopyToPublishDirectory="PreserveNewest">
 			<LinuxPath>/etc/systemd/system/iotsharp.service</LinuxPath>
@@ -152,7 +148,6 @@
 		<None Remove="IoTSharp.db" />
 		<None Remove="IoTSharp.db-shm" />
 		<None Remove="IoTSharp.db-wal" />
-		<None Remove="IoTSharp.xml" />
 		<None Remove="Resources\buzzle-template.png" />
 		<None Remove="Resources\slide1.jpg" />
 		<None Remove="Resources\slide10.jpg" />
