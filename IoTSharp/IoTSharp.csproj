@@ -118,6 +118,7 @@
 		<Content Include="IoTSharp.xml">
 			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</Content>
+		<None Include="..\ClientApp\public\96x96.png" Pack="true" PackagePath="\" Visible="false" />
 		<Content Include="iotsharp.service" CopyToPublishDirectory="PreserveNewest">
 			<LinuxPath>/etc/systemd/system/iotsharp.service</LinuxPath>
 		</Content>
@@ -180,10 +181,6 @@
 		<_WebToolingArtifacts Remove="Properties\PublishProfiles\osx-x64.pubxml" />
 		<_WebToolingArtifacts Remove="Properties\PublishProfiles\registry.hub.docker.com_iotsharp.pubxml" />
 		<_WebToolingArtifacts Remove="Properties\PublishProfiles\win-x64.pubxml" />
-		<None Include="..\docs\static\img\96x96.png">
-			<Pack>True</Pack>
-			<PackagePath></PackagePath>
-		</None>
 	</ItemGroup>
 
 	<ItemGroup>
