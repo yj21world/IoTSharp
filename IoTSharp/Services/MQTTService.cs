@@ -100,7 +100,7 @@ namespace IoTSharp.Services
                 var dev = args.SessionItems[nameof(Device)] as Device;
                 if (dev != null)
                 {
-                    await _queue.PublishConnect(dev.Id, ConnectStatus.Disconnected);
+                    await PublishDisconnectedAsync(dev);
                 }
                 else
                 {
@@ -142,7 +142,7 @@ namespace IoTSharp.Services
             return Task.CompletedTask;
         }
 
-        internal Task Server_ClientConnectionValidator(ValidatingConnectionEventArgs e)
+        internal async Task Server_ClientConnectionValidator(ValidatingConnectionEventArgs e)
         {
             try
             {
@@ -186,69 +186,13 @@ namespace IoTSharp.Services
                                 var device = mcr.Device;
                                 e.SessionItems.Add(nameof(Device), device);
                                 e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.Success;
-                                _queue.PublishConnect(device.Id, ConnectStatus.Connected);
+                                await PublishConnectedAsync(device);
                                 _logger.LogInformation($"Device {device.Name}({device.Id}) is online !username is {obj.UserName} and  is endpoint{obj.RemoteEndPoint.ToString()}");
                             }
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "ConnectionRefusedServerUnavailable {0}", ex.Message);
                                 e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.ServerUnavailable;
-                            }
-                        }
-                        else if (_dbContextcv.AuthorizedKeys.Any(ak => ak.AuthToken == obj.Password && ak.Deleted == false))
-                        {
-                            var ak = _dbContextcv.AuthorizedKeys.Include(ak => ak.Customer).Include(ak => ak.Tenant).Include(ak => ak.Devices).FirstOrDefault(ak => ak.AuthToken == obj.Password && ak.Deleted == false);
-                            if (ak != null && !ak.Devices.Any(dev => dev.Name == obj.UserName))
-                            {
-                                var devvalue = new Device() { Name = obj.UserName, DeviceType = DeviceType.Device, Timeout = 300 };
-                                devvalue.Tenant = ak.Tenant;
-                                devvalue.Customer = ak.Customer;
-                                _dbContextcv.Device.Add(devvalue);
-                                ak.Devices.Add(devvalue);
-                                _dbContextcv.AfterCreateDevice(devvalue, obj.UserName, obj.Password);
-                                _dbContextcv.SaveChanges();
-                                _queue.PublishConnect(devvalue.Id, ConnectStatus.Connected);
-                            }
-                            var mcp = _dbContextcv.DeviceIdentities.Include(d => d.Device).FirstOrDefault(mc => mc.IdentityType == IdentityType.DevicePassword && mc.IdentityId == obj.UserName && mc.IdentityValue == obj.Password);
-                            if (mcp != null)
-                            {
-                                e.SessionItems.Add(nameof(Device), mcp.Device);
-                                e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.Success;
-                                _queue.PublishConnect(mcp.Device.Id, ConnectStatus.Connected);
-                                _logger.LogInformation($"Device {mcp.Device.Name}({mcp.Device.Id}) is online !username is {obj.UserName} and  is endpoint{obj.RemoteEndPoint.ToString()}");
-                            }
-                            else
-                            {
-                                e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.BadUserNameOrPassword;
-                                _logger.LogInformation($"Bad username or  password/AuthToken {obj.UserName},connection {obj.RemoteEndPoint.ToString()} refused");
-                            }
-                        }
-                        else if (_dbContextcv.Produces.Any(ak => obj.UserName.StartsWith(ak.Name + "_") && ak.ProduceToken == obj.Password && ak.Deleted == false))
-                        {
-                            var ak = _dbContextcv.Produces.Include(ak => ak.Customer).Include(ak => ak.Tenant).Include(ak => ak.Devices).FirstOrDefault(ak => ak.ProduceToken == obj.Password && ak.Deleted == false);
-                            if (ak != null && !ak.Devices.Any(d => d.Name == obj.UserName && d.Deleted == false))
-                            {
-                                var devvalue = new Device() { Name = obj.UserName, DeviceType = ak.DefaultDeviceType, Timeout = ak.DefaultTimeout };
-                                devvalue.Tenant = ak.Tenant;
-                                devvalue.Customer = ak.Customer;
-                                _dbContextcv.Device.Add(devvalue);
-                                ak.Devices.Add(devvalue);
-                                _dbContextcv.AfterCreateDevice(devvalue, ak.Id);
-                                _dbContextcv.SaveChanges();
-                                _queue.PublishConnect(devvalue.Id, ConnectStatus.Connected);
-                            }
-                            var mcp = ak.Devices.FirstOrDefault(d => d.Name == obj.UserName && d.Deleted == false);
-                            if (mcp != null)
-                            {
-                                e.SessionItems.Add(nameof(Device), mcp);
-                                e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.Success;
-                                _queue.PublishConnect(mcp.Id, ConnectStatus.Connected);
-                                _logger.LogInformation($"Produce {ak.Name}'s   device {mcp.Name}({mcp.Id}) is online ! Client name  is {obj.UserName} and  is endpoint{obj.RemoteEndPoint.ToString()}");
-                            }
-                            else
-                            {
-                                e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.BadUserNameOrPassword;
-                                _logger.LogInformation($"Bad device name  or  ProduceToken {obj.UserName},connection {obj.RemoteEndPoint.ToString()} refused");
                             }
                         }
                         else
@@ -265,7 +209,19 @@ namespace IoTSharp.Services
                 e.ReasonString = ex.Message;
                 _logger.LogError(ex, "ImplementationSpecificError {0}", ex.Message);
             }
-            return Task.CompletedTask;
+            return;
+        }
+
+        private async Task PublishConnectedAsync(Device device)
+        {
+            await _queue.PublishConnect(device.Id, ConnectStatus.Connected);
+            await _queue.PublishActive(device.Id, ActivityStatus.Activity);
+        }
+
+        private async Task PublishDisconnectedAsync(Device device)
+        {
+            await _queue.PublishConnect(device.Id, ConnectStatus.Disconnected);
+            await _queue.PublishActive(device.Id, ActivityStatus.Inactivity);
         }
     }
 }

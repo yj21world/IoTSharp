@@ -173,7 +173,7 @@ public class CollectionTaskService
             GatewayDeviceId = dto.EdgeNodeId,
             Protocol = dto.Protocol.ToString(),
             Version = dto.Version,
-            Enabled = true,
+            Enabled = dto.Enabled,
             ConnectionJson = dto.Connection != null ? JsonSerializer.Serialize(dto.Connection) : null,
             ReportPolicyJson = dto.ReportPolicy != null ? JsonSerializer.Serialize(dto.ReportPolicy) : null,
             CreatedAt = DateTime.UtcNow,
@@ -188,14 +188,9 @@ public class CollectionTaskService
                 TaskId = task.Id,
                 DeviceKey = deviceDto.DeviceKey,
                 DeviceName = deviceDto.DeviceName,
-                SlaveId = deviceDto.ProtocolOptions.HasValue
-                    ? (byte)(deviceDto.ProtocolOptions.Value.TryGetProperty("SlaveId", out var slaveIdProp)
-                        ? slaveIdProp.GetInt32() : 1)
-                    : (byte)1,
+                SlaveId = (byte)GetProtocolOptionInt(deviceDto.ProtocolOptions, "SlaveId", 1),
                 Enabled = deviceDto.Enabled,
-                ProtocolOptionsJson = deviceDto.ProtocolOptions.HasValue
-                    ? deviceDto.ProtocolOptions.Value.GetRawText()
-                    : null,
+                ProtocolOptionsJson = GetProtocolOptionsJson(deviceDto.ProtocolOptions),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -212,7 +207,8 @@ public class CollectionTaskService
                     Address = ParseAddress(pointDto.Address),
                     RegisterCount = (ushort)pointDto.Length,
                     RawDataType = pointDto.RawValueType,
-                    ByteOrder = "AB",
+                    ByteOrder = GetProtocolOptionString(pointDto.ProtocolOptions, "ByteOrder", "AB"),
+                    WordOrder = GetProtocolOptionString(pointDto.ProtocolOptions, "WordOrder", "AB"),
                     ReadPeriodMs = pointDto.Polling?.ReadPeriodMs ?? 30000,
                     PollingGroup = pointDto.Polling?.Group,
                     TransformsJson = SerializeTransforms(pointDto.Transforms),
@@ -222,7 +218,7 @@ public class CollectionTaskService
                     DisplayName = pointDto.Mapping?.DisplayName,
                     Unit = pointDto.Mapping?.Unit,
                     GroupName = pointDto.Mapping?.Group,
-                    Enabled = true,
+                    Enabled = pointDto.Enabled,
                     SortOrder = 0,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -251,6 +247,7 @@ public class CollectionTaskService
         existing.TaskKey = dto.TaskKey;
         existing.GatewayDeviceId = dto.EdgeNodeId;
         existing.Protocol = dto.Protocol.ToString();
+        existing.Enabled = dto.Enabled;
         existing.ConnectionJson = dto.Connection != null ? JsonSerializer.Serialize(dto.Connection) : null;
         existing.ReportPolicyJson = dto.ReportPolicy != null ? JsonSerializer.Serialize(dto.ReportPolicy) : null;
         existing.UpdatedAt = DateTime.UtcNow;
@@ -295,14 +292,9 @@ public class CollectionTaskService
 
             device.DeviceKey = deviceDto.DeviceKey;
             device.DeviceName = deviceDto.DeviceName;
-            device.SlaveId = deviceDto.ProtocolOptions.HasValue
-                ? (byte)(deviceDto.ProtocolOptions.Value.TryGetProperty("SlaveId", out var slaveIdProp)
-                    ? slaveIdProp.GetInt32() : 1)
-                : (byte)1;
+            device.SlaveId = (byte)GetProtocolOptionInt(deviceDto.ProtocolOptions, "SlaveId", 1);
             device.Enabled = deviceDto.Enabled;
-            device.ProtocolOptionsJson = deviceDto.ProtocolOptions.HasValue
-                ? deviceDto.ProtocolOptions.Value.GetRawText()
-                : null;
+            device.ProtocolOptionsJson = GetProtocolOptionsJson(deviceDto.ProtocolOptions);
             device.UpdatedAt = DateTime.UtcNow;
 
             var existingPoints = device.Points?.ToList() ?? new List<CollectionPoint>();
@@ -343,14 +335,8 @@ public class CollectionTaskService
                 point.Address = ParseAddress(pointDto.Address);
                 point.RegisterCount = (ushort)pointDto.Length;
                 point.RawDataType = pointDto.RawValueType;
-                point.ByteOrder = pointDto.ProtocolOptions.HasValue
-                    && pointDto.ProtocolOptions.Value.TryGetProperty("ByteOrder", out var byteOrderProp)
-                    ? byteOrderProp.GetString()
-                    : "AB";
-                point.WordOrder = pointDto.ProtocolOptions.HasValue
-                    && pointDto.ProtocolOptions.Value.TryGetProperty("WordOrder", out var wordOrderProp)
-                    ? wordOrderProp.GetString()
-                    : "AB";
+                point.ByteOrder = GetProtocolOptionString(pointDto.ProtocolOptions, "ByteOrder", "AB");
+                point.WordOrder = GetProtocolOptionString(pointDto.ProtocolOptions, "WordOrder", "AB");
                 point.ReadPeriodMs = pointDto.Polling?.ReadPeriodMs ?? 30000;
                 point.PollingGroup = pointDto.Polling?.Group;
                 point.TransformsJson = SerializeTransforms(pointDto.Transforms);
@@ -360,7 +346,7 @@ public class CollectionTaskService
                 point.DisplayName = pointDto.Mapping?.DisplayName;
                 point.Unit = pointDto.Mapping?.Unit;
                 point.GroupName = pointDto.Mapping?.Group;
-                point.Enabled = true;
+                point.Enabled = pointDto.Enabled;
                 point.UpdatedAt = DateTime.UtcNow;
             }
         }
@@ -410,7 +396,13 @@ public class CollectionTaskService
                         DisplayName = point.DisplayName,
                         Unit = point.Unit,
                         Group = point.GroupName
-                    }
+                    },
+                    ProtocolOptions = JsonSerializer.SerializeToElement(new Dictionary<string, string>
+                    {
+                        ["ByteOrder"] = string.IsNullOrWhiteSpace(point.ByteOrder) ? "AB" : point.ByteOrder,
+                        ["WordOrder"] = string.IsNullOrWhiteSpace(point.WordOrder) ? "AB" : point.WordOrder
+                    }),
+                    Enabled = point.Enabled
                 };
                 pointDtos.Add(pointDto);
             }
@@ -420,9 +412,7 @@ public class CollectionTaskService
                 DeviceKey = device.DeviceKey,
                 DeviceName = device.DeviceName,
                 Enabled = device.Enabled,
-                ProtocolOptions = !string.IsNullOrEmpty(device.ProtocolOptionsJson)
-                    ? JsonDocument.Parse(device.ProtocolOptionsJson).RootElement
-                    : null,
+                ProtocolOptions = BuildDeviceProtocolOptions(device),
                 Points = pointDtos
             };
             deviceDtos.Add(deviceDto);
@@ -434,6 +424,7 @@ public class CollectionTaskService
             TaskKey = task.TaskKey,
             Protocol = Enum.TryParse<CollectionProtocolType>(task.Protocol, out var p) ? p : CollectionProtocolType.Unknown,
             Version = task.Version,
+            Enabled = task.Enabled,
             EdgeNodeId = task.GatewayDeviceId,
             Connection = !string.IsNullOrEmpty(task.ConnectionJson)
                 ? JsonSerializer.Deserialize<CollectionConnectionDto>(task.ConnectionJson)
@@ -474,6 +465,72 @@ public class CollectionTaskService
         if (ushort.TryParse(address, out var addr))
             return addr;
         return 0;
+    }
+
+    private static int GetProtocolOptionInt(JsonElement? protocolOptions, string propertyName, int fallback)
+    {
+        if (!TryGetProtocolOption(protocolOptions, propertyName, out var value))
+        {
+            return fallback;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+            JsonValueKind.String when int.TryParse(value.GetString(), out var number) => number,
+            _ => fallback
+        };
+    }
+
+    private static string GetProtocolOptionString(JsonElement? protocolOptions, string propertyName, string fallback)
+    {
+        if (!TryGetProtocolOption(protocolOptions, propertyName, out var value))
+        {
+            return fallback;
+        }
+
+        return value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
+            ? value.GetString()
+            : fallback;
+    }
+
+    private static string GetProtocolOptionsJson(JsonElement? protocolOptions)
+    {
+        return IsProtocolOptionsObject(protocolOptions)
+            ? protocolOptions.Value.GetRawText()
+            : null;
+    }
+
+    private static JsonElement BuildDeviceProtocolOptions(CollectionDevice device)
+    {
+        var options = new Dictionary<string, object>
+        {
+            ["SlaveId"] = device.SlaveId
+        };
+
+        if (!string.IsNullOrWhiteSpace(device.ProtocolOptionsJson))
+        {
+            using var document = JsonDocument.Parse(device.ProtocolOptionsJson);
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                options[property.Name] = property.Value.Deserialize<object>();
+            }
+        }
+
+        options["SlaveId"] = device.SlaveId;
+        return JsonSerializer.SerializeToElement(options);
+    }
+
+    private static bool TryGetProtocolOption(JsonElement? protocolOptions, string propertyName, out JsonElement value)
+    {
+        value = default;
+        return IsProtocolOptionsObject(protocolOptions)
+            && protocolOptions.Value.TryGetProperty(propertyName, out value);
+    }
+
+    private static bool IsProtocolOptionsObject(JsonElement? protocolOptions)
+    {
+        return protocolOptions.HasValue && protocolOptions.Value.ValueKind == JsonValueKind.Object;
     }
 
     private static string SerializeTransforms(IReadOnlyList<ValueTransformDto> transforms)

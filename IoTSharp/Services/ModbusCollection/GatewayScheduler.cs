@@ -34,6 +34,16 @@ public class GatewayScheduler
     private CancellationToken _cancellationToken;
 
     /// <summary>
+    /// 采集任务ID
+    /// </summary>
+    public Guid TaskId => _task.Id;
+
+    /// <summary>
+    /// 采集任务配置版本
+    /// </summary>
+    public int TaskVersion => _task.Version;
+
+    /// <summary>
     /// 网关设备名称
     /// </summary>
     public string GatewayDeviceName => _task.GatewayDevice?.Name ?? string.Empty;
@@ -204,6 +214,12 @@ public class GatewayScheduler
         foreach (var batch in batches)
         {
             await OnBatchReadyAsync(batch);
+        }
+
+        foreach (var point in tempList)
+        {
+            _lastCollected[point.Id] = now;
+            queue.Enqueue(point, point.ReadPeriodMs);
         }
     }
 

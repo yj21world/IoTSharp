@@ -1,5 +1,7 @@
 # 前端页面需求：透传网关 Modbus 采集模块
 
+**书名**：HVAC 云端管理平台前端页面设计手册
+
 ## 1. 目标
 
 本文档描述透传网关 Modbus 采集模块的前端页面需求。当前后台管理系统使用 Vue 3、Element Plus、Vue Router、Pinia、Axios，并已存在 `ClientApp/src/views/iot/collectiontask/collectiontasklist.vue` 和 `ClientApp/src/api/collectiontask/index.ts`。本阶段前端以业务可用为优先，不追求复杂组态、拖拽式配置或高级交互，优先使用查询表格、基础表单、弹窗或抽屉完成采集任务配置、日志查看和调试排障。
@@ -326,5 +328,4 @@ ClientApp/src/api/collectiontask/
 
 ## 12. 备注
 
-当前已有页面使用了 `ConsoleCrudWorkspace` 包装，并提供了任务列表、弹窗编辑和日志弹窗。后续可以在保留现有页面入口的基础上，逐步把 JSON 编辑模式替换为业务表格模式。这个模块的前端目标不是做“漂亮的大屏”，而是让现场调试人员能快速配置、验证和排查透传网关 Modbus 采集链路。
-
+当前已有页面提供了任务列表、弹窗编辑和日志弹窗。后续可以在保留现有页面入口的基础上，逐步把 JSON 编辑模式替换为业务表格模式。这个模块的前端目标不是做“漂亮的大屏”，而是让现场调试人员能快速配置、验证和排查透传网关 Modbus 采集链路。

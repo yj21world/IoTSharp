@@ -17,6 +17,8 @@ public class GatewaySchedulerManager
     private readonly ILogger<GatewaySchedulerManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ConcurrentDictionary<Guid, GatewayScheduler> _schedulers = new();
+    private readonly ConcurrentDictionary<Guid, Task> _runningTasks = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _schedulerTokens = new();
     private readonly ConcurrentDictionary<string, Guid> _gatewayNameToId = new();
     private CancellationTokenSource _cts;
     private Func<BatchRequest, Task> _batchHandler;
@@ -43,6 +45,19 @@ public class GatewaySchedulerManager
         var gatewayId = task.GatewayDeviceId;
         var gatewayName = task.GatewayDevice.Name;
 
+        if (_schedulers.TryGetValue(gatewayId, out var existingScheduler)
+            && existingScheduler.TaskId == task.Id
+            && existingScheduler.TaskVersion == task.Version)
+        {
+            StartSchedulerIfNeeded(gatewayId, existingScheduler);
+            _logger.LogDebug(
+                "Scheduler for gateway {Gateway}, task {TaskId}, version {Version} is already current",
+                gatewayName,
+                task.Id,
+                task.Version);
+            return;
+        }
+
         // 创建新的调度器
         var options = new GatewaySchedulerOptions();
         var scheduler = new GatewayScheduler(
@@ -53,6 +68,7 @@ public class GatewaySchedulerManager
         // 添加或替换
         if (_schedulers.TryRemove(gatewayId, out var oldScheduler))
         {
+            StopScheduler(gatewayId);
             _logger.LogInformation("Replacing existing scheduler for gateway {Gateway}", gatewayName);
         }
 
@@ -65,6 +81,8 @@ public class GatewaySchedulerManager
             scheduler.OnBatchReadyAsync += _batchHandler;
         }
 
+        StartSchedulerIfNeeded(gatewayId, scheduler);
+
         _logger.LogInformation("Added scheduler for gateway {Gateway}, task {TaskId}", gatewayName, task.Id);
     }
 
@@ -75,6 +93,7 @@ public class GatewaySchedulerManager
     {
         if (_schedulers.TryRemove(gatewayDeviceId, out var scheduler))
         {
+            StopScheduler(gatewayDeviceId);
             _logger.LogInformation("Removed scheduler for gateway {Gateway}", scheduler.GatewayDeviceName);
         }
     }
@@ -106,14 +125,16 @@ public class GatewaySchedulerManager
     public async Task StartAllAsync()
     {
         _cts = new CancellationTokenSource();
-        var token = _cts.Token;
 
         _logger.LogInformation("Starting {Count} gateway schedulers", _schedulers.Count);
 
-        var tasks = _schedulers.Values.Select(s => s.RunAsync(token));
-        await Task.WhenAll(tasks);
+        foreach (var item in _schedulers)
+        {
+            StartSchedulerIfNeeded(item.Key, item.Value);
+        }
 
         _logger.LogInformation("All gateway schedulers started");
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -122,11 +143,17 @@ public class GatewaySchedulerManager
     public async Task StopAllAsync()
     {
         _cts?.Cancel();
+        foreach (var id in _schedulerTokens.Keys.ToList())
+        {
+            StopScheduler(id);
+        }
 
         _logger.LogInformation("Stopping {Count} gateway schedulers", _schedulers.Count);
 
         await Task.Delay(500); // 等待调度器自然停止
 
+        _runningTasks.Clear();
+        _schedulerTokens.Clear();
         _logger.LogInformation("All gateway schedulers stopped");
     }
 
@@ -170,5 +197,33 @@ public class GatewaySchedulerManager
             scheduler.OnBatchReadyAsync += handler;
         }
         _batchHandler = handler;
+    }
+
+    private void StartSchedulerIfNeeded(Guid gatewayDeviceId, GatewayScheduler scheduler)
+    {
+        if (_cts == null || _cts.IsCancellationRequested || scheduler.IsRunning)
+        {
+            return;
+        }
+
+        if (_runningTasks.TryGetValue(gatewayDeviceId, out var runningTask) && !runningTask.IsCompleted)
+        {
+            return;
+        }
+
+        var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        _schedulerTokens[gatewayDeviceId] = linkedTokenSource;
+        _runningTasks[gatewayDeviceId] = Task.Run(() => scheduler.RunAsync(linkedTokenSource.Token));
+    }
+
+    private void StopScheduler(Guid gatewayDeviceId)
+    {
+        if (_schedulerTokens.TryRemove(gatewayDeviceId, out var tokenSource))
+        {
+            tokenSource.Cancel();
+            tokenSource.Dispose();
+        }
+
+        _runningTasks.TryRemove(gatewayDeviceId, out _);
     }
 }

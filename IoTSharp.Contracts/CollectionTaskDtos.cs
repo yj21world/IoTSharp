@@ -96,6 +96,7 @@ public sealed record CollectionTaskDto
     public string TaskKey { get; init; } = string.Empty;
     public CollectionProtocolType Protocol { get; init; } = CollectionProtocolType.Unknown;
     public int Version { get; init; }
+    public bool Enabled { get; init; } = true;
     public Guid EdgeNodeId { get; init; }
     public CollectionConnectionDto Connection { get; init; } = new();
     public IReadOnlyList<CollectionDeviceDto> Devices { get; init; } = [];
@@ -138,6 +139,7 @@ public sealed record CollectionPointDto
     public IReadOnlyList<ValueTransformDto> Transforms { get; init; } = [];
     public PlatformMappingDto Mapping { get; init; } = new();
     public JsonElement? ProtocolOptions { get; init; }
+    public bool Enabled { get; init; } = true;
 }
 
 public sealed record PollingPolicyDto

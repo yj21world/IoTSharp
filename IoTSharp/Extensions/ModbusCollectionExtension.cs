@@ -15,6 +15,7 @@ public static class ModbusCollectionExtension
     {
         services.AddSingleton<CollectionConfigurationLoader>();
         services.AddSingleton<GatewaySchedulerManager>();
+        services.AddSingleton<ModbusMqttTransport>();
         services.AddHostedService<ModbusCollectionService>();
         return services;
     }

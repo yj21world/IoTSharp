@@ -5,12 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Server;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,17 +20,19 @@ namespace IoTSharp.Services.ModbusCollection;
 /// </summary>
 public class ModbusCollectionService : BackgroundService
 {
+    private const int DefaultRequestTimeoutMs = 5000;
+
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly MqttServer _mqttServer;
     private readonly ILogger<ModbusCollectionService> _logger;
     private readonly IPublisher _publisher;
     private readonly CollectionConfigurationLoader _configLoader;
+    private readonly ModbusMqttTransport _mqttTransport;
 
     // 网关调度器管理器
     private readonly GatewaySchedulerManager _schedulerManager;
 
     // 请求-响应匹配器
-    private readonly ConcurrentDictionary<string, PendingRequest> _pendingRequests = new();
+    private readonly ConcurrentDictionary<string, PendingRequest> _pendingRequests = new(StringComparer.OrdinalIgnoreCase);
 
     // 网关在线状态
     private readonly ConcurrentDictionary<string, bool> _gatewayOnline = new();
@@ -41,18 +42,18 @@ public class ModbusCollectionService : BackgroundService
 
     public ModbusCollectionService(
         IServiceScopeFactory scopeFactory,
-        MqttServer mqttServer,
         ILogger<ModbusCollectionService> logger,
         IPublisher publisher,
         GatewaySchedulerManager schedulerManager,
-        CollectionConfigurationLoader configLoader)
+        CollectionConfigurationLoader configLoader,
+        ModbusMqttTransport mqttTransport)
     {
         _scopeFactory = scopeFactory;
-        _mqttServer = mqttServer;
         _logger = logger;
         _publisher = publisher;
         _configLoader = configLoader;
         _schedulerManager = schedulerManager;
+        _mqttTransport = mqttTransport;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,11 +62,11 @@ public class ModbusCollectionService : BackgroundService
 
         try
         {
-            // 1. 订阅 MQTT 消息处理
-            await SubscribeToMqttTopicsAsync();
+            // 1. 启动 MQTT transport
+            StartMqttTransport();
 
-            // 2. 监听 MQTT 客户端事件
-            SubscribeToMqttEvents();
+            // 2. 启动响应消费循环
+            _ = ConsumeResponsesAsync(stoppingToken);
 
             // 3. 加载配置并启动调度器
             await LoadAndStartSchedulersAsync();
@@ -92,81 +93,48 @@ public class ModbusCollectionService : BackgroundService
         }
         finally
         {
+            StopMqttTransport();
             await StopSchedulersAsync();
             _logger.LogInformation("ModbusCollectionService stopped");
         }
     }
 
-    /// <summary>
-    /// 订阅 MQTT Topic
-    /// </summary>
-    private Task SubscribeToMqttTopicsAsync()
+    private void StartMqttTransport()
     {
-        // 订阅所有网关的响应 Topic
-        // Topic: gateway/{gatewayName}/modbus/response/{requestId}
-        _logger.LogInformation("Subscribing to MQTT topics: gateway/+/modbus/response/+");
-        // 注：实际订阅在 MqttServer 上通过事件处理
-        return Task.CompletedTask;
+        _mqttTransport.Start();
     }
 
-    /// <summary>
-    /// 监听 MQTT 事件
-    /// </summary>
-    private void SubscribeToMqttEvents()
+    private void StopMqttTransport()
     {
-        // 监听客户端发布到 Broker 的消息
-        _mqttServer.InterceptingPublishAsync += HandleMqttMessageAsync;
+        _mqttTransport.Stop();
     }
 
-    /// <summary>
-    /// 处理 MQTT 消息
-    /// </summary>
-    private Task HandleMqttMessageAsync(InterceptingPublishEventArgs e)
+    private async Task ConsumeResponsesAsync(CancellationToken stoppingToken)
     {
-        var topic = e.ApplicationMessage.Topic;
-
-        // Topic: gateway/{gatewayName}/modbus/response/{requestId}
-        if (!topic.StartsWith("gateway/") || !topic.Contains("/modbus/response/"))
+        await foreach (var response in _mqttTransport.Responses.ReadAllAsync(stoppingToken))
         {
-            return Task.CompletedTask;
+            _logger.LogInformation(
+                "Received Modbus response from gateway {Gateway}, payload={Payload}",
+                response.GatewayName,
+                response.Payload);
+
+            _ = Task.Run(
+                () => ProcessModbusResponseAsync(response.GatewayName, response.Payload),
+                CancellationToken.None);
         }
-
-        try
-        {
-            var parts = topic.Split('/');
-            if (parts.Length < 5)
-                return Task.CompletedTask;
-
-            var gatewayName = parts[1];
-            var requestId = parts[4];
-            var payload = e.ApplicationMessage.ConvertPayloadToString() ?? string.Empty;
-
-            _logger.LogDebug(
-                "Received Modbus response from gateway {Gateway}, requestId={RequestId}, payload={Payload}",
-                gatewayName, requestId, payload);
-
-            // 在后台处理响应
-            _ = Task.Run(() => ProcessModbusResponseAsync(gatewayName, requestId, payload));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error handling MQTT message for topic {Topic}", topic);
-        }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
     /// 处理 Modbus 响应
     /// </summary>
-    private async Task ProcessModbusResponseAsync(string gatewayName, string requestId, string payload)
+    private async Task ProcessModbusResponseAsync(string gatewayName, string payload)
     {
         try
         {
             // 1. 查找待处理的请求
-            if (!_pendingRequests.TryRemove(requestId, out var pending))
+            if (!_pendingRequests.TryRemove(gatewayName, out var pending))
             {
-                _logger.LogWarning("No pending request found for requestId={RequestId}", requestId);
+                _logger.LogWarning("No pending request found for gateway {Gateway}", gatewayName);
                 return;
             }
 
@@ -175,7 +143,7 @@ public class ModbusCollectionService : BackgroundService
                 ModbusRtuProtocol.FromHexString(payload),
                 pending.FunctionCode);
 
-            response.RequestId = requestId;
+            response.RequestId = pending.RequestId;
             response.RequestAt = pending.RequestAt;
             response.ResponseAt = DateTime.UtcNow;
 
@@ -196,7 +164,7 @@ public class ModbusCollectionService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing Modbus response for requestId={RequestId}", requestId);
+            _logger.LogError(ex, "Error processing Modbus response for gateway {Gateway}", gatewayName);
         }
     }
 
@@ -218,25 +186,56 @@ public class ModbusCollectionService : BackgroundService
                 Convert.ToDouble(rawValue),
                 pending.TransformsJson);
 
+            var targetDeviceId = pending.TargetDeviceId ?? pending.GatewayDeviceId;
+            var targetName = string.IsNullOrWhiteSpace(pending.TargetName)
+                ? pending.PointId.ToString("N")
+                : pending.TargetName;
+
+            if (!pending.TargetDeviceId.HasValue)
+            {
+                _logger.LogInformation(
+                    "Use gateway as telemetry target because point target device is not configured: Gateway={Gateway}, Point={Point}, Key={Key}",
+                    pending.GatewayDeviceId, pending.PointId, targetName);
+            }
+
             // 3. 写入遥测数据
-            if (pending.TargetDeviceId.HasValue)
+            if (IsAttributeTarget(pending.TargetType))
+            {
+                var attributes = new Dictionary<string, object>
+                {
+                    { targetName, convertedValue }
+                };
+
+                await _publisher.PublishAttributeData(new PlayloadData
+                {
+                    DeviceId = targetDeviceId,
+                    MsgBody = attributes,
+                    DataSide = DataSide.ClientSide,
+                    DataCatalog = DataCatalog.AttributeData
+                });
+
+                _logger.LogInformation(
+                    "Published attribute: Device={Device}, Key={Key}, Value={Value}",
+                    targetDeviceId, targetName, convertedValue);
+            }
+            else
             {
                 var telemetry = new Dictionary<string, object>
                 {
-                    { pending.TargetName, convertedValue }
+                    { targetName, convertedValue }
                 };
 
                 await _publisher.PublishTelemetryData(new PlayloadData
                 {
-                    DeviceId = pending.TargetDeviceId.Value,
+                    DeviceId = targetDeviceId,
                     MsgBody = telemetry,
                     DataSide = DataSide.ClientSide,
                     DataCatalog = DataCatalog.TelemetryData
                 });
 
-                _logger.LogDebug(
+                _logger.LogInformation(
                     "Published telemetry: Device={Device}, Key={Key}, Value={Value}",
-                    pending.TargetDeviceId, pending.TargetName, convertedValue);
+                    targetDeviceId, targetName, convertedValue);
             }
         }
         catch (Exception ex)
@@ -291,7 +290,8 @@ public class ModbusCollectionService : BackgroundService
         string transformsJson,
         Guid? targetDeviceId,
         string targetName,
-        int timeoutMs = 2000)
+        string targetType,
+        int timeoutMs = DefaultRequestTimeoutMs)
     {
         var requestId = Guid.NewGuid().ToString("N");
         var requestAt = DateTime.UtcNow;
@@ -315,30 +315,42 @@ public class ModbusCollectionService : BackgroundService
             ByteOrder = byteOrder,
             TransformsJson = transformsJson,
             TargetDeviceId = targetDeviceId,
-            TargetName = targetName
+            TargetName = targetName,
+            TargetType = targetType
         };
-        _pendingRequests[requestId] = pending;
+        if (!_pendingRequests.TryAdd(gatewayName, pending))
+        {
+            _logger.LogWarning(
+                "Skip Modbus request because gateway already has an in-flight request: Gateway={Gateway}, PointId={PointId}",
+                gatewayName,
+                pointId);
+            return string.Empty;
+        }
 
         // 3. 发布 MQTT 消息
         // Topic: gateway/{gatewayName}/modbus/request/{requestId}
-        var topic = $"gateway/{gatewayName}/modbus/request/{requestId}";
-        var message = new MqttApplicationMessageBuilder()
-            .WithTopic(topic)
-            .WithPayload(hexPayload)
-            .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.AtMostOnce)
-            .Build();
+        var topic = ModbusTopic.BuildRequestTopic(gatewayName, requestId);
+        try
+        {
+            await _mqttTransport.PublishRequestAsync(gatewayName, requestId, hexPayload);
+        }
+        catch
+        {
+            _pendingRequests.TryRemove(gatewayName, out _);
+            throw;
+        }
 
-        await _mqttServer.PublishAsync(gatewayName, message);
-
-        _logger.LogDebug(
-            "Sent Modbus request: Gateway={Gateway}, RequestId={RequestId}, Frame={Frame}",
-            gatewayName, requestId, hexPayload);
+        _logger.LogInformation(
+            "Sent Modbus request: Gateway={Gateway}, Topic={Topic}, RequestId={RequestId}, TimeoutMs={TimeoutMs}, Frame={Frame}",
+            gatewayName, topic, requestId, timeoutMs, hexPayload);
 
         // 4. 启动超时检测
         _ = Task.Run(async () =>
         {
             await Task.Delay(timeoutMs);
-            if (_pendingRequests.TryRemove(requestId, out var p))
+            if (_pendingRequests.TryGetValue(gatewayName, out var current) &&
+                string.Equals(current.RequestId, requestId, StringComparison.Ordinal) &&
+                _pendingRequests.TryRemove(gatewayName, out var p))
             {
                 _logger.LogWarning(
                     "Modbus request timeout: Gateway={Gateway}, RequestId={RequestId}",
@@ -430,13 +442,30 @@ public class ModbusCollectionService : BackgroundService
 
         if (!isGatewayOnline)
         {
-            _logger.LogDebug("Skip Modbus batch for offline gateway {Gateway}", gatewayName);
+            _logger.LogInformation("Skip Modbus batch for offline gateway {Gateway}", gatewayName);
             return;
         }
+
+        _logger.LogInformation(
+            "Sending Modbus batch for gateway {Gateway}: slave={SlaveId}, function={FunctionCode}, points={PointCount}",
+            gatewayName,
+            batch.SlaveId,
+            batch.FunctionCode,
+            batch.Points.Count);
+
+        var timeoutMs = GetRequestTimeoutMs(batch.Device?.Task);
 
         // 遍历批次中的每个点位，发送单独的请求
         foreach (var point in batch.Points)
         {
+            if (_pendingRequests.ContainsKey(gatewayName))
+            {
+                _logger.LogDebug(
+                    "Gateway {Gateway} already has an in-flight request, defer remaining points in current batch",
+                    gatewayName);
+                break;
+            }
+
             await SendModbusRequestAsync(
                 gatewayName,
                 gatewayDeviceId,
@@ -451,8 +480,42 @@ public class ModbusCollectionService : BackgroundService
                 point.ByteOrder,
                 point.TransformsJson,
                 point.TargetDeviceId,
-                point.TargetName
+                point.TargetName,
+                point.TargetType,
+                timeoutMs
             );
+        }
+    }
+
+    private static bool IsAttributeTarget(string targetType)
+    {
+        return string.Equals(targetType, CollectionTargetType.Attribute.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private int GetRequestTimeoutMs(CollectionTask task)
+    {
+        if (string.IsNullOrWhiteSpace(task?.ConnectionJson))
+        {
+            return DefaultRequestTimeoutMs;
+        }
+
+        try
+        {
+            var connection = JsonSerializer.Deserialize<CollectionConnectionDto>(
+                task.ConnectionJson,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            return connection?.TimeoutMs > 0
+                ? connection.TimeoutMs
+                : DefaultRequestTimeoutMs;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Invalid CollectionTask connection config, use default Modbus timeout {TimeoutMs}ms", DefaultRequestTimeoutMs);
+            return DefaultRequestTimeoutMs;
         }
     }
 
@@ -516,4 +579,5 @@ internal class PendingRequest
     public string TransformsJson { get; set; }
     public Guid? TargetDeviceId { get; set; }
     public string TargetName { get; set; }
+    public string TargetType { get; set; }
 }

@@ -16,15 +16,16 @@ public static class ModbusDataParser
     public static object ParseRegisters(byte[] data, string dataType, string byteOrder)
     {
         var registers = ToUInt16Array(data);
+        var normalizedDataType = dataType?.ToLowerInvariant() ?? string.Empty;
 
-        return dataType.ToLowerInvariant() switch
+        return normalizedDataType switch
         {
             "bool" => ParseBool(registers),
             "int16" => ParseInt16(registers),
             "uint16" => registers[0],
-            "int32" => ParseInt32(registers, byteOrder),
-            "uint32" => ParseUInt32(registers, byteOrder),
-            "float32" => ParseFloat32(registers, byteOrder),
+            "int32" => ParseInt32(registers, NormalizeByteOrder(byteOrder, 4)),
+            "uint32" => ParseUInt32(registers, NormalizeByteOrder(byteOrder, 4)),
+            "float32" => ParseFloat32(registers, NormalizeByteOrder(byteOrder, 4)),
             "float64" => ParseFloat64(registers, byteOrder),
             "string" => ParseString(registers),
             _ => registers[0]
@@ -60,6 +61,7 @@ public static class ModbusDataParser
     /// </summary>
     public static int ParseInt32(ushort[] registers, string byteOrder)
     {
+        EnsureRegisterCount(registers, 2, nameof(ParseInt32));
         var bytes = ToBytes(registers, byteOrder);
         return BitConverter.ToInt32(bytes, 0);
     }
@@ -69,6 +71,7 @@ public static class ModbusDataParser
     /// </summary>
     public static uint ParseUInt32(ushort[] registers, string byteOrder)
     {
+        EnsureRegisterCount(registers, 2, nameof(ParseUInt32));
         var bytes = ToBytes(registers, byteOrder);
         return BitConverter.ToUInt32(bytes, 0);
     }
@@ -78,6 +81,7 @@ public static class ModbusDataParser
     /// </summary>
     public static float ParseFloat32(ushort[] registers, string byteOrder)
     {
+        EnsureRegisterCount(registers, 2, nameof(ParseFloat32));
         var bytes = ToBytes(registers, byteOrder);
         return BitConverter.ToSingle(bytes, 0);
     }
@@ -87,6 +91,7 @@ public static class ModbusDataParser
     /// </summary>
     public static double ParseFloat64(ushort[] registers, string byteOrder)
     {
+        EnsureRegisterCount(registers, 4, nameof(ParseFloat64));
         var bytes = new byte[8];
         var wordBytes = ToBytes(registers, byteOrder);
         Buffer.BlockCopy(wordBytes, 0, bytes, 0, 8);
@@ -125,7 +130,7 @@ public static class ModbusDataParser
     /// </summary>
     private static byte[] ToBytes(ushort[] registers, string byteOrder)
     {
-        return byteOrder.ToUpperInvariant() switch
+        return (byteOrder ?? string.Empty).ToUpperInvariant() switch
         {
             "AB" => new[] { (byte)(registers[0] >> 8), (byte)(registers[0] & 0xFF) },
             "BA" => new[] { (byte)(registers[0] & 0xFF), (byte)(registers[0] >> 8) },
@@ -147,6 +152,31 @@ public static class ModbusDataParser
             },
             _ => throw new ArgumentException($"Unsupported byte order: {byteOrder}")
         };
+    }
+
+    private static string NormalizeByteOrder(string byteOrder, int byteCount)
+    {
+        if (byteCount != 4)
+        {
+            return byteOrder;
+        }
+
+        return (byteOrder ?? string.Empty).ToUpperInvariant() switch
+        {
+            "AB" => "ABCD",
+            "BA" => "BADC",
+            "" => "ABCD",
+            _ => byteOrder
+        };
+    }
+
+    private static void EnsureRegisterCount(ushort[] registers, int requiredCount, string parserName)
+    {
+        if (registers.Length < requiredCount)
+        {
+            throw new ArgumentException(
+                $"{parserName} requires at least {requiredCount} registers, but response contains {registers.Length}.");
+        }
     }
 
     /// <summary>

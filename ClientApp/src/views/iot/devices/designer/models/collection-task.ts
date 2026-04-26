@@ -22,6 +22,7 @@ export interface CollectionTaskModel {
 	taskKey: string;
 	protocol: CollectionProtocolType;
 	version: number;
+	enabled?: boolean;
 	edgeNodeId?: string;
 	connection: ProtocolConnectionModel;
 	devices: ProtocolDeviceModel[];
@@ -61,6 +62,7 @@ export interface CollectionPointModel {
 	transforms: ValueTransformModel[];
 	mapping: PlatformMappingModel;
 	protocolOptions?: Record<string, any>;
+	enabled?: boolean;
 	description?: string;
 	previewRawValue?: unknown;
 	previewTransformedValue?: unknown;
