@@ -10,13 +10,13 @@
 
 ## 一、需求概述
 
-基于需求文档 `task/HVAC-Cloud-Collection-Module.md`，实施 IoTSharp 平台的云端 Modbus 采集模块。
+基于需求文档 `docs/archive/task/HVAC-Cloud-Collection-Module.md`，实施 IoTSharp 平台的云端 Modbus 采集模块。
 
 ### 1.1 当前状态
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 需求文档 | ✅ 完成 | `task/HVAC-Cloud-Collection-Module.md` |
+| 需求文档 | ✅ 完成 | `docs/archive/task/HVAC-Cloud-Collection-Module.md` |
 | DTO 定义 | ✅ 完成 | `CollectionTaskDtos.cs` |
 | Controller 草稿 | ✅ 完成 | `CollectionTaskController.cs` (仅返回假数据) |
 | 数据库实体 | ✅ 完成 | 4 个实体 + 4 个 Configuration |
@@ -287,5 +287,5 @@ dotnet ef database update
 
 ## 八、相关文档
 
-- 需求文档: `task/HVAC-Cloud-Collection-Module.md`
+- 需求文档: `docs/archive/task/HVAC-Cloud-Collection-Module.md`
 - AGENTS.md: `AGENTS.md`

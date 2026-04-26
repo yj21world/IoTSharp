@@ -422,6 +422,6 @@ ThingsCloud MQTT Topic 模式（参考）：
 
 | 文档 | 关系 |
 |------|------|
-| `task/IoTSharp-Architecture.md` | 平台工程架构说明 |
-| `task/IoTSharp-Core-Code-Flow.md` | 核心代码流程参考 |
-| `task/IoTSharp-Database-Schema.md` | 数据库 Schema 参考 |
+| `docs/archive/task/IoTSharp-Architecture.md` | 平台工程架构说明 |
+| `docs/archive/task/IoTSharp-Core-Code-Flow.md` | 核心代码流程参考 |
+| `docs/archive/task/IoTSharp-Database-Schema.md` | 数据库 Schema 参考 |

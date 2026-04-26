@@ -449,6 +449,6 @@ dotnet ef database update
 
 ## 十、相关文档
 
-- 需求文档: `task/HVAC-Cloud-Collection-Module.md`
-- 实施计划: `task/HVAC-Cloud-Collection-Module-Implementation-Plan.md`
+- 需求文档: `docs/archive/task/HVAC-Cloud-Collection-Module.md`
+- 实施计划: `docs/archive/task/HVAC-Cloud-Collection-Module-Implementation-Plan.md`
 - 项目概述: `AGENTS.md`
