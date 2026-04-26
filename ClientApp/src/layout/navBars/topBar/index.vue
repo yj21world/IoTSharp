@@ -111,7 +111,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-	mittBus.off('getBreadcrumbIndexSetFilterRoutes', () => {});
+	mittBus.off('getBreadcrumbIndexSetFilterRoutes', () => { });
 });
 </script>
 

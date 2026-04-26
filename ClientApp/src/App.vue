@@ -6,7 +6,7 @@
 			<Setings ref="setingsRef" v-show="setLockScreen" />
 			<CloseFull v-if="!themeConfig.isLockScreen" />
 		</template>
-	
+
 	</el-config-provider>
 </template>
 
@@ -22,8 +22,8 @@ import other from '/@/utils/other';
 import { Local, Session } from '/@/utils/storage';
 import mittBus from '/@/utils/mitt';
 import setIntroduction from '/@/utils/setIconfont';
-import {getSysInfo} from "/@/api/installer";
-import {useAppInfo} from "/@/stores/appInfo";
+import { getSysInfo } from "/@/api/installer";
+import { useAppInfo } from "/@/stores/appInfo";
 // 引入组件
 const LockScreen = defineAsyncComponent(() => import('/@/layout/lockScreen/index.vue'));
 const Setings = defineAsyncComponent(() => import('/@/layout/navBars/topBar/setings.vue'));
@@ -33,8 +33,8 @@ const CloseFull = defineAsyncComponent(() => import('/@/layout/navBars/topBar/cl
 // 定义变量内容
 const { messages, locale } = useI18n();
 const setingsRef = ref();
-const route = useRoute();  
- const router = useRouter();
+const route = useRoute();
+const router = useRouter();
 const stores = useTagsViewRoutes();
 const storesThemeConfig = useThemeConfig();
 const { themeConfig } = storeToRefs(storesThemeConfig);
@@ -67,18 +67,18 @@ const getGlobalI18n = computed(() => {
 onBeforeMount(async () => {
 
 	try {
-        const {data}= await getSysInfo()
-	
+		const { data } = await getSysInfo()
 
-	
-        storesAppInfo.setAppInfo(data)
-        if (!storesAppInfo.appInfo.installed) {
-		
-           router.replace({ path:'/installer'})
-        }
-      } catch (e) {
-        ElMessage.error('获取应用信息失败')
-      }
+
+
+		storesAppInfo.setAppInfo(data)
+		if (!storesAppInfo.appInfo.installed) {
+
+			router.replace({ path: '/installer' })
+		}
+	} catch (e) {
+		ElMessage.error('获取应用信息失败')
+	}
 	// 设置批量第三方 icon 图标
 	setIntroduction.cssCdn();
 	// 设置批量第三方 js
@@ -104,7 +104,7 @@ onMounted(() => {
 });
 // 页面销毁时，关闭监听布局配置/i18n监听
 onUnmounted(() => {
-	mittBus.off('openSetingsDrawer', () => {});
+	mittBus.off('openSetingsDrawer', () => { });
 });
 // 监听路由的变化，设置网站标题
 watch(

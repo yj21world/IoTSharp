@@ -100,6 +100,7 @@ export const createDeviceCrudOptions = function ({ expose }, customerId, deviceD
 
 			table: {
 				border: false,
+				height: '100%',
 				onSelectionChange,
 			},
 			form: {

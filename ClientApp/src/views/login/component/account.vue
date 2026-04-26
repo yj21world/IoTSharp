@@ -1,38 +1,10 @@
 <template>
 	<div class="account-login">
-		<div class="account-login__tip">
-			<div class="account-login__tip-head">
-				<div>
-					<div class="account-login__tip-title">管理员入口</div>
-					<div class="account-login__tip-text">
-						默认管理员账号已预填。输入初始化后的密码并完成滑块拼图验证后，即可进入控制台首页。
-					</div>
-				</div>
-				<div class="account-login__tip-badge">Secure Access</div>
-			</div>
-
-			<div class="account-login__tip-grid">
-				<div class="account-login__tip-item account-login__tip-item--account">
-					<span>预设账号</span>
-					<strong>{{ ruleForm.userName }}</strong>
-				</div>
-				<div class="account-login__tip-item">
-					<span>验证方式</span>
-					<strong>滑块拼图</strong>
-				</div>
-				<div class="account-login__tip-item">
-					<span>进入后</span>
-					<strong>控制台工作台</strong>
-				</div>
-			</div>
-		</div>
-
-				<div class="account-login__form-card">
+		<div class="account-login__form-card">
 			<el-form class="account-login__form" size="large" @submit.prevent="onSignIn">
 				<el-form-item class="account-login__field account-login__field--1">
 					<div class="account-login__label-row">
-						<div class="account-login__label">用户名和密码</div>
-						<div class="account-login__label-note">默认管理员入口，可直接修改</div>
+						<div class="account-login__label">用户名</div>
 					</div>
 					<el-input
 						v-model="ruleForm.userName"
@@ -50,7 +22,6 @@
 
 				<div class="account-login__label-row account-login__label-row--between">
 					<div class="account-login__label">密码</div>
-					<div class="account-login__label-note">输入初始化时设置的登录密码</div>
 				</div>
 
 				<el-form-item class="account-login__field account-login__field--2">
@@ -76,25 +47,12 @@
 
 				<el-form-item class="account-login__field account-login__field--3">
 					<div class="account-login__actions">
-						<div class="account-login__meta">
-							<div class="account-login__meta-copy">
-								<div class="account-login__meta-title">校验通过后自动提交登录</div>
-								<div class="account-login__meta-text">登录前需要先完成一次安全校验，验证通过后系统会自动提交登录。</div>
-							</div>
-						</div>
 						<el-button type="primary" class="account-login__submit" native-type="submit" :loading="loading.signIn">
-							登录控制台
+							登录
 						</el-button>
 					</div>
 				</el-form-item>
 			</el-form>
-
-			<div class="account-login__signup">
-				<span>还没有账号？</span>
-				<router-link to="/signup">
-					<el-link type="primary" underline="never">立即注册</el-link>
-				</router-link>
-			</div>
 		</div>
 
 		<el-dialog
@@ -387,106 +345,17 @@ const signInSuccess = () => {
 .account-login {
 	display: flex;
 	flex-direction: column;
-	gap: 22px;
 }
 
-.account-login__tip,
 .account-login__form-card {
-	padding: 18px 20px;
-	border-radius: 24px;
-	border: 1px solid rgba(226, 232, 240, 0.9);
-	background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(255, 255, 255, 0.98));
+	width: 100%;
 }
 
-.account-login__tip {
-	background:
-		radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 34%),
-		linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(14, 165, 233, 0.08));
-}
-
-.account-login__tip-head,
-.account-login__signup,
 .captcha-shell__footer {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-}
-
-.account-login__tip-title {
-	color: #113b67;
-	font-size: 14px;
-	font-weight: 700;
-}
-
-.account-login__tip-text {
-	margin-top: 6px;
-	color: #5f7289;
-	font-size: 13px;
-	line-height: 1.7;
-}
-
-.account-login__tip-badge {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	height: 32px;
-	padding: 0 12px;
-	border-radius: 999px;
-	border: 1px solid rgba(37, 99, 235, 0.12);
-	background: rgba(255, 255, 255, 0.66);
-	color: #2563eb;
-	font-size: 12px;
-	font-weight: 700;
-	white-space: nowrap;
-}
-
-.account-login__tip-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 12px;
-	margin-top: 16px;
-}
-
-.account-login__tip-item {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	min-width: 0;
-	padding: 14px 16px;
-	border-radius: 18px;
-	border: 1px solid rgba(255, 255, 255, 0.72);
-	background: rgba(255, 255, 255, 0.78);
-}
-
-.account-login__tip-item--account {
-	grid-column: 1 / -1;
-	padding: 16px 18px;
-	border-color: rgba(191, 219, 254, 0.82);
-	background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.94));
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-}
-
-.account-login__tip-item span {
-	display: block;
-	color: #64748b;
-	font-size: 12px;
-}
-
-.account-login__tip-item strong {
-	display: block;
-	margin-top: 0;
-	color: #123b6d;
-	font-size: 15px;
-	font-weight: 700;
-	line-height: 1.45;
-}
-
-.account-login__tip-item--account strong {
-	font-size: 14px;
-	letter-spacing: -0.01em;
-	overflow-wrap: anywhere;
-	word-break: break-word;
 }
 
 .account-login__form {
@@ -527,57 +396,11 @@ const signInSuccess = () => {
 	line-height: 1.2;
 }
 
-.account-login__label-note {
-	display: inline-flex;
-	align-items: center;
-	min-height: 18px;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: #8a9ab0;
-	font-size: 11px;
-	font-weight: 600;
-	line-height: 1.4;
-	text-align: right;
-	white-space: nowrap;
-}
-
 .account-login__actions {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
 	width: 100%;
-}
-
-.account-login__meta {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 4px;
-	padding: 14px 16px;
-	border-radius: 16px;
-	border: 1px solid rgba(226, 232, 240, 0.9);
-	background: linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(255, 255, 255, 0.98));
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
-.account-login__meta-copy {
-	display: flex;
-	flex-direction: column;
-	gap: 5px;
-	min-width: 0;
-}
-
-.account-login__meta-title {
-	color: #163c66;
-	font-size: 13px;
-	font-weight: 700;
-	line-height: 1.4;
-}
-
-.account-login__meta-text {
-	color: #6d8098;
-	font-size: 12px;
-	line-height: 1.65;
 }
 
 .account-login__submit {
@@ -587,14 +410,6 @@ const signInSuccess = () => {
 	letter-spacing: 0.02em;
 	font-weight: 700;
 	box-shadow: 0 18px 32px rgba(37, 99, 235, 0.2);
-}
-
-.account-login__signup {
-	margin-top: 2px;
-	padding-top: 16px;
-	border-top: 1px solid rgba(226, 232, 240, 0.9);
-	color: #68819d;
-	font-size: 13px;
 }
 
 .account-login__password-toggle {
@@ -694,28 +509,13 @@ const signInSuccess = () => {
 
 @media (max-width: 767px) {
 	.account-login__label-row,
-	.account-login__tip-head,
-	.account-login__signup,
 	.captcha-shell__footer {
 		flex-direction: column;
 		align-items: flex-start;
 	}
 
-	.account-login__meta {
-		gap: 10px;
-	}
-
-	.account-login__label-note {
-		text-align: left;
-		white-space: normal;
-	}
-
 	.account-login__label-row--between {
 		padding: 0;
-	}
-
-	.account-login__tip-grid {
-		grid-template-columns: 1fr;
 	}
 }
 </style>

@@ -6,16 +6,20 @@
 			</div>
 			<template #dropdown>
 				<el-dropdown-menu>
-					<el-dropdown-item command="large" :disabled="disabledSize === 'large'">{{ $t('message.user.dropdownLarge') }}</el-dropdown-item>
-					<el-dropdown-item command="default" :disabled="disabledSize === 'default'">{{ $t('message.user.dropdownDefault') }}</el-dropdown-item>
-					<el-dropdown-item command="small" :disabled="disabledSize === 'small'">{{ $t('message.user.dropdownSmall') }}</el-dropdown-item>
+					<el-dropdown-item command="large" :disabled="disabledSize === 'large'">{{
+						$t('message.user.dropdownLarge') }}</el-dropdown-item>
+					<el-dropdown-item command="default" :disabled="disabledSize === 'default'">{{
+						$t('message.user.dropdownDefault') }}</el-dropdown-item>
+					<el-dropdown-item command="small" :disabled="disabledSize === 'small'">{{
+						$t('message.user.dropdownSmall') }}</el-dropdown-item>
 				</el-dropdown-menu>
 			</template>
 		</el-dropdown>
 
 		<el-dropdown trigger="click" @command="onLanguageChange">
 			<div class="layout-navbars-breadcrumb-user__icon">
-				<i class="iconfont" :class="disabledI18n === 'en' ? 'icon-fuhao-yingwen' : 'icon-fuhao-zhongwen'" :title="$t('message.user.title1')"></i>
+				<i class="iconfont" :class="disabledI18n === 'en' ? 'icon-fuhao-yingwen' : 'icon-fuhao-zhongwen'"
+					:title="$t('message.user.title1')"></i>
 			</div>
 			<template #dropdown>
 				<el-dropdown-menu>
@@ -50,28 +54,27 @@
 		</div>
 
 		<div class="layout-navbars-breadcrumb-user__icon" @click="onScreenfullClick">
-			<i
-				class="iconfont"
-				:title="isScreenfull ? $t('message.user.title6') : $t('message.user.title5')"
-				:class="!isScreenfull ? 'icon-fullscreen' : 'icon-tuichuquanping'"
-			></i>
+			<i class="iconfont" :title="isScreenfull ? $t('message.user.title6') : $t('message.user.title5')"
+				:class="!isScreenfull ? 'icon-fullscreen' : 'icon-tuichuquanping'"></i>
 		</div>
 
 		<el-dropdown @command="onHandleCommandClick">
 			<span class="layout-navbars-breadcrumb-user__link">
 				<img :src="userInfos.photo" class="layout-navbars-breadcrumb-user__photo" />
-				<span class="layout-navbars-breadcrumb-user__name">{{ userInfos.userName === '' ? 'common' : userInfos.userName }}</span>
+				<span class="layout-navbars-breadcrumb-user__name">{{ userInfos.userName === '' ? 'common' :
+					userInfos.userName
+					}}</span>
 				<el-icon class="el-icon--right">
 					<ele-ArrowDown />
 				</el-icon>
 			</span>
 			<template #dropdown>
 				<el-dropdown-menu>
-					<el-dropdown-item command="/home">{{ $t('message.user.dropdown1') }}</el-dropdown-item>
+					<!-- <el-dropdown-item command="/home">{{ $t('message.user.dropdown1') }}</el-dropdown-item>
 					<el-dropdown-item command="/profile">{{ $t('message.user.dropdown2') }}</el-dropdown-item>
 					<el-dropdown-item command="iotsharp">{{ $t('message.user.dropdown6') }}</el-dropdown-item>
 					<el-dropdown-item command="docs">{{ $t('message.user.dropdown3') }}</el-dropdown-item>
-					<el-dropdown-item command="github">{{ $t('message.user.dropdown4') }}</el-dropdown-item>
+					<el-dropdown-item command="github">{{ $t('message.user.dropdown4') }}</el-dropdown-item> -->
 					<el-dropdown-item divided command="logOut">{{ $t('message.user.dropdown5') }}</el-dropdown-item>
 				</el-dropdown-menu>
 			</template>
@@ -165,7 +168,7 @@ export default defineComponent({
 						Session.clear();
 						window.location.reload();
 					})
-					.catch(() => {});
+					.catch(() => { });
 			} else if (path === 'iotsharp') {
 				window.open('https://iotsharp.net/');
 			} else if (path === 'github') {
