@@ -408,11 +408,14 @@ package-lock.json
 
 
 
-
-
-
-
-
+# Claude Code local/private/runtime files
+.claude/settings.local.json
+.claude/autonomy/
+.claude/skill-learning/
+.claude/**/*.log
+.claude/**/tmp/
+.claude/**/cache/
+*.stackdump
 
 
 
