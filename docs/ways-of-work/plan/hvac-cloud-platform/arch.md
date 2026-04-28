@@ -368,6 +368,12 @@ sequenceDiagram
 - 控制命令不能只是一次 MQTT Publish。
 - 控制命令必须有可查询状态、超时处理、权限校验和结果回写。
 
+第一阶段策略：
+
+- 当前代码已有 RPC 通道（`RpcClient`、`RpcController`），支持基于 MQTT 的请求/响应模式。
+- 第一阶段做最简版：沿用现有 RPC 下发通道，补齐操作日志记录和基本的权限校验。
+- 完整状态机（Pending → Sent → Executed → Confirmed / Failed / Timeout）推迟到后续阶段实现。
+
 ### 5.6 规则与告警层
 
 职责：
@@ -399,20 +405,19 @@ sequenceDiagram
 
 ### 6.2 生产建议
 
-第一阶段建议保持单体部署：
+第一阶段采用单实例单体部署：
 
-- 1 个或多个 IoTSharp 应用实例。
+- 1 个 IoTSharp 应用实例（内置 MQTT Broker 跟随应用进程）。
 - 独立 PostgreSQL/TimescaleDB。
 - 独立 RabbitMQ。
 - 可选 Redis。
 - 对外暴露 HTTP/HTTPS 与 MQTT 端口。
 
-在多实例部署时需要重点确认：
+第一阶段非目标（已明确推迟）：
 
-- 内置 MQTT Broker 的会话和 Topic 路由是否适合横向扩展。
-- Modbus 采集调度是否需要分布式锁或单实例调度约束。
-- Quartz Job 是否会在多实例重复执行。
-- 网关长连接是否需要固定路由或独立接入层。
+- 多实例横向扩展。当前 MQTTnet 内置 Broker 的会话和订阅状态保存在进程内存中，不支持跨实例共享。第一阶段只做单实例，扩展问题暂不处理。
+- Modbus 采集调度运行在单实例 `ModbusCollectionService`（`BackgroundService` + `while` 循环）中，同一网关的请求通过 `ConcurrentDictionary` 串行化，不存在跨实例冲突。
+- Quartz Job 去重。单实例下不存在重复执行问题。
 
 ## 7. 安全与隔离
 
@@ -452,6 +457,51 @@ sequenceDiagram
 - 底层通信设备与业务暖通设备必须分离建模。
 - API 返回结构继续遵循 `ApiResult<T>`，列表和查询结果统一使用 `{ total, rows }`。
 - 修改 DTO、枚举、公共接口签名、Job 构造函数签名后，必须执行完整 clean/build/run 流程，不能只依赖热重载。
+
+### 10.1 第一阶段决策记录（2026-04-27 架构审核）
+
+以下决策基于架构审核讨论得出，明确第一阶段（最小闭环）的实施边界。
+
+**时序存储与写入策略：**
+
+- 时序存储选用 **TimescaleDB**（与 PostgreSQL 统一运维，无需额外部署服务）。
+- 所有遥测数据同时写入 `TelemetryData`（历史）和 `TelemetryLatest`（最新值），不做点位级区分策略。
+- 不做降采样，不设自动数据保留清理。后续根据运维情况再调整。
+
+**事件总线：**
+
+- 保持当前 CAP + RabbitMQ 事件总线架构不变。
+- 遥测数据逐条发布 CAP 事件，不做批量聚合。
+- CAP 成功消息过期时间保持默认 21600 秒（6 小时），定期自动清理。
+
+**控制命令：**
+
+- 第一阶段做最简版：沿用现有 RPC 通道（`RpcClient` / `RpcController`）做 MQTT 下发。
+- 补齐操作日志记录和基本权限校验。
+- 完整控制命令状态机推迟到后续阶段。
+
+**MQTT Broker：**
+
+- 单实例部署，内置 MQTTnet Broker 跟随应用进程。
+- MQTT 会话和订阅保存在进程内存中，不做跨实例共享。
+- 横向扩展问题推迟到后续阶段。
+
+**Modbus 采集：**
+
+- 同一网关下的采集请求通过 `ConcurrentDictionary<string, PendingRequest>` 保证串行执行（一次只允许一个飞测请求）。
+- 采集调度通过 `GatewayScheduler` 的三级优先级队列（高速 <15s / 中速 15-45s / 低速 >45s）管理周期。
+- `CollectionConnectionDto.RetryCount` 字段已定义但未使用，当前依赖调度周期自然重试。即时重试推迟到后续阶段。
+
+**第一阶段明确推迟的模块：**
+
+| 模块 | 推迟原因 |
+|------|----------|
+| 业务设备建模（Asset/AssetRelation 暖通化） | 先跑通通信层闭环，后续再建模 |
+| 规则链引擎（FlowRule/FlowRuleProcessor） | 先完成数据入库，规则链后续启用 |
+| 多租户与数据隔离完善 | 当前项目规模暂不需要，最后处理 |
+| 前端架构重构 | 只做最基础的设备管理和数据查看 |
+| 边缘 JSON 接入版本管理 | 原仓库已有功能，后续再评估暖通化需求 |
+| 能耗统计 | 先有数据积累，再构建统计层 |
 
 ## 11. 后续拆分建议
 

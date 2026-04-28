@@ -98,15 +98,6 @@ export const frontEndRoutes: Array<RouteRecordRaw> = [
 		},
 	},
 	{
-		path: '/iot/devices/gatewaydesigner',
-		name: 'gatewaydesigner',
-		component: () => import('/@/views/iot/devices/gatewaydesigner.vue'),
-		meta: {
-			title: 'message.router.home',
-			isHide: true,
-		},
-	},
-	{
 		path: '/iot/devices/edgetasks',
 		name: 'edgetasks',
 		component: () => import('/@/views/iot/edge/edgetasks.vue'),

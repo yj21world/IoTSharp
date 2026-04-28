@@ -1,4 +1,4 @@
-﻿using IoTSharp.Contracts;
+using IoTSharp.Contracts;
 using IoTSharp.Data;
 using IoTSharp.Dtos;
 using IoTSharp.Extensions;
@@ -89,7 +89,6 @@ namespace IoTSharp.Controllers
                             new() { text = "设备类型模板", i18n = "", vi18n="iot.devicetypeprofilelist", routename="devicetypeprofilelist", link = "/iot/devicetypeprofile/devicetypeprofilelist", vpath = "/iot/devicetypeprofile/devicetypeprofilelist",  },
                             new() { text = "采集任务", i18n = "", vi18n="iot.collectiontasklist", routename="collectiontasklist", link = "/iot/collection/collectiontasklist", vpath = "/iot/collection/collectiontasklist",  },
                             // new() { text = "场景", i18n = "", vi18n="iot.scene", routename="scene", link = "/iot/scene/scenedetail", vpath = "/iot/scene/scenedetail",  },
-                          //  new() { text = "网关配置器", i18n = "", vi18n="iot.devicegraph", routename="devicegraph", link = "/iot/devices/devicegraph", vpath="/iot/devices/devicegraph", },
                         }
                 });
                 _user_menu.Add(new()
