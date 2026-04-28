@@ -2,57 +2,15 @@
 	<div>
 		<el-drawer v-model="drawer" :size="'78%'" class="device-detail-drawer" append-to-body destroy-on-close>
 			<div class="device-detail">
-				<section class="device-detail__hero">
-					<div class="device-detail__hero-main">
-						<div class="device-detail__eyebrow">Device Workspace</div>
-						<div class="device-detail__title-row">
-							<div>
-								<h2>{{ deviceName }}</h2>
-								<p>聚合查看基础信息、属性、遥测、规则和告警，减少在多个页面之间反复切换。</p>
-							</div>
-							<div class="device-detail__hero-actions">
-								<el-button :icon="Refresh" circle @click="reloadbaseinfo" :loading="refreshing" />
-								<el-button v-if="canDownloadCert" type="primary" plain :icon="Download" @click="downloadCert">下载证书</el-button>
-							</div>
-						</div>
-						<div class="device-detail__hero-meta">
-							<div class="status-pill" :class="`status-pill--${statusClass}`">
-								<el-icon>
-									<CircleCheckFilled v-if="deviceRef?.active" />
-									<CircleCloseFilled v-else />
-								</el-icon>
-								{{ statusText }}
-							</div>
-							<div class="hero-meta-item">
-								<span>设备类型</span>
-								<strong>{{ deviceTypeText }}</strong>
-							</div>
-							<div class="hero-meta-item">
-								<span>认证方式</span>
-								<strong>{{ identityTypeText }}</strong>
-							</div>
-							<div class="hero-meta-item">
-								<span>最近活动</span>
-								<strong>{{ lastActivityText }}</strong>
-							</div>
-						</div>
-					</div>
-
-					<div class="device-detail__hero-side">
-						<div v-for="item in summaryCards" :key="item.label" class="summary-card">
-							<div class="summary-card__label">{{ item.label }}</div>
-							<div class="summary-card__value">{{ item.value }}</div>
-							<p>{{ item.hint }}</p>
-						</div>
-					</div>
-				</section>
 
 				<section class="device-detail__tabs-wrap">
 					<el-tabs v-model="activeTabName" class="device-detail-tabs">
 						<el-tab-pane name="basic">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><Monitor /></el-icon>
+									<el-icon>
+										<Monitor />
+									</el-icon>
 									概览
 								</span>
 							</template>
@@ -65,17 +23,15 @@
 												<p>展示设备类型、认证方式、最近活动时间以及平台内标识信息。</p>
 											</div>
 										</div>
-										<AdvancedKeyValue
-											:obj="deviceRef"
-											:config="columns"
+										<AdvancedKeyValue :obj="deviceRef" :config="columns"
 											:hide-key-list="['owner', 'identityValue', 'tenantName', 'customerName', 'tenantId', 'customerId']"
-											:label-width="160"
-										>
+											:label-width="160">
 											<template #footer v-if="canDownloadCert">
 												<div class="detail-cert-row">
 													<div class="detail-cert-row__label">证书下载</div>
 													<div class="detail-cert-row__value">
-														<el-button type="primary" plain @click="downloadCert">导出 X509 证书包</el-button>
+														<el-button type="primary" plain @click="downloadCert">导出 X509
+															证书包</el-button>
 													</div>
 												</div>
 											</template>
@@ -90,7 +46,8 @@
 											</div>
 										</div>
 										<div class="quick-info-list">
-											<div v-for="item in quickInfoItems" :key="item.label" class="quick-info-item">
+											<div v-for="item in quickInfoItems" :key="item.label"
+												class="quick-info-item">
 												<span>{{ item.label }}</span>
 												<strong>{{ item.value }}</strong>
 											</div>
@@ -103,7 +60,9 @@
 						<el-tab-pane name="props">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><Grid /></el-icon>
+									<el-icon>
+										<Grid />
+									</el-icon>
 									属性
 								</span>
 							</template>
@@ -115,7 +74,9 @@
 						<el-tab-pane name="telemetry">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><DataAnalysis /></el-icon>
+									<el-icon>
+										<DataAnalysis />
+									</el-icon>
 									遥测
 								</span>
 							</template>
@@ -127,7 +88,9 @@
 						<el-tab-pane name="telemetryHistory" :lazy="true">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><TrendCharts /></el-icon>
+									<el-icon>
+										<TrendCharts />
+									</el-icon>
 									遥测历史
 								</span>
 							</template>
@@ -139,7 +102,9 @@
 						<el-tab-pane name="alarm">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><Bell /></el-icon>
+									<el-icon>
+										<Bell />
+									</el-icon>
 									告警
 								</span>
 							</template>
@@ -151,7 +116,9 @@
 						<el-tab-pane name="rules">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><Connection /></el-icon>
+									<el-icon>
+										<Connection />
+									</el-icon>
 									规则
 								</span>
 							</template>
@@ -160,29 +127,36 @@
 							</div>
 						</el-tab-pane>
 
+						<el-tab-pane name="collectionTasks" :lazy="true">
+							<template #label>
+								<span class="device-tab-label">
+									<el-icon>
+										<Connection />
+									</el-icon>
+									采集任务
+								</span>
+							</template>
+							<div class="detail-pane">
+								<CollectionTaskWorkspace :device-id="deviceRef?.id" embedded />
+							</div>
+						</el-tab-pane>
+
 						<el-tab-pane name="rulesHistory">
 							<template #label>
 								<span class="device-tab-label">
-									<el-icon><Clock /></el-icon>
+									<el-icon>
+										<Clock />
+									</el-icon>
 									规则历史
 								</span>
 							</template>
 							<div class="detail-pane">
-								<flowevents :creator="deviceRef?.id" :creatorname="deviceRef?.name" wrapper="div"></flowevents>
+								<flowevents :creator="deviceRef?.id" :creatorname="deviceRef?.name" wrapper="div">
+								</flowevents>
 							</div>
 						</el-tab-pane>
 
-						<el-tab-pane name="map">
-							<template #label>
-								<span class="device-tab-label">
-									<el-icon><Location /></el-icon>
-									地图
-								</span>
-							</template>
-							<div class="detail-pane">
-								<BMap :device-id="deviceRef?.id"></BMap>
-							</div>
-						</el-tab-pane>
+
 					</el-tabs>
 				</section>
 			</div>
@@ -214,6 +188,7 @@ import DeviceDetailProps from '/@/views/iot/devices/detail/DeviceDetailProps.vue
 import DeviceDetailRules from '/@/views/iot/devices/detail/DeviceDetailRules.vue';
 import DeviceDetailTelemetry from '/@/views/iot/devices/detail/DeviceDetailTelemetry.vue';
 import DeviceDetailTelemetryHistory from '/@/views/iot/devices/detail/DeviceDetailTelemetryHistory.vue';
+import CollectionTaskWorkspace from '/@/views/iot/collectiontask/components/CollectionTaskWorkspace.vue';
 import Alarmlist from '/@/views/iot/alarms/alarmlist.vue';
 import Flowevents from '/@/views/iot/rules/flowevents.vue';
 import { deviceApi } from '/@/api/devices';
@@ -541,6 +516,7 @@ defineExpose({
 }
 
 @media (max-width: 1280px) {
+
 	.device-detail__hero,
 	.detail-grid {
 		grid-template-columns: 1fr;

@@ -61,15 +61,15 @@ export const frontEndRoutes: Array<RouteRecordRaw> = [
 			isHide: true,
 		},
 	},
-	{
-		path: '/iot/forms/edit',
-		name: 'edit',
-		component: () => import('/@/views/iot/forms/edit.vue'),
-		meta: {
-			title: '编辑',
-			isHide: true,
-		},
-	},
+	// {
+	// 	path: '/iot/forms/edit',
+	// 	name: 'edit',
+	// 	component: () => import('/@/views/iot/forms/edit.vue'),
+	// 	meta: {
+	// 		title: '编辑',
+	// 		isHide: true,
+	// 	},
+	// },
 	{
 		path: '/iot/rules/flowsimulator',
 		name: 'flowsimulator',
