@@ -1,9 +1,15 @@
 # Implementation Plan：边缘网关 JSON 接入模块
 
 > 对应 PRD：[边缘网关 JSON 接入模块 PRD](../03-edge-json-ingestion/prd.md)
-> 状态：**基础能力已有，待补齐格式规范和诊断能力**
+> 状态：**暂不处理**
+>
+> 当前 HVAC 云端平台需求暂不考虑边缘采集网关场景。本实施计划仅作为历史分析保留，后续 agent 不应执行本文中的代码任务。
 
 ## 1. 实施概述
+
+**当前阶段不实施本模块。**
+
+需求范围已调整为暂不考虑边缘网关。当前阶段聚焦透传网关、云端 Modbus 采集、点位模板、实时/历史数据、控制命令和基础告警。以下历史实施内容仅作为未来恢复边缘网关需求时的参考。
 
 边缘 JSON 接入主要复用现有 MQTT Controller（`TelemetryController`、`GatewayController`）和 HTTP Controller（`DevicesController`），核心链路已跑通。重点工作是：
 1. 审查现有 JSON 处理逻辑，补充错误日志上下文。
@@ -187,6 +193,8 @@ _logger.LogWarning(
 
 ## 8. 实施步骤
 
+> 暂停执行：以下步骤当前不进入任务队列。
+
 1. 审查 `TelemetryController` — 增强 JSON 解析错误处理和日志。
 2. 审查 `GatewayController` — 确认 ThingsBoard 兼容格式的处理完整性。
 3. 如没有 HTTP 网关批量上传端点，在 `DevicesController` 中新增。
@@ -200,3 +208,32 @@ _logger.LogWarning(
 - CAP EventBus 发布逻辑 — 已工作。
 - `GatewayPlayload` DTO — ThingsBoard 兼容格式已定义。
 - 遥测存储链（CAP → IStorage.StoreTelemetryAsync）— 已工作。
+
+## 10. 代码验证审核补充（2026-04-28）
+
+> 当前结论更新：代码事实仍保留，但本模块因产品范围调整为暂不处理。
+
+当前仓库除 MQTT/HTTP 遥测上传外，还已经有 `EdgeController` 处理边缘节点注册、心跳、能力上报、任务状态和详情查询。后续边缘 JSON 接入不应只理解为“上传遥测”，还要纳入边缘节点身份、版本、能力和诊断。
+
+### 10.1 当前真实代码状态
+
+| 能力 | 当前代码 | 审核结论 |
+|------|----------|----------|
+| 普通设备 MQTT JSON | `MQTTControllers/TelemetryController.telemetry()` | 已存在 |
+| 网关 MQTT 批量遥测 | `MQTTControllers/GatewayController.telemetry()` | 已存在 ThingsBoard 风格入口 |
+| HTTP Raw JSON/XML | `DevicesController.PushDataToMap`、`PushDataToRuleChains` | 已存在，但偏规则链/RawData 网关 |
+| 边缘节点管理 | `IoTSharp/Controllers/EdgeController.cs` | 已实现注册、心跳、能力、列表、详情等基础能力 |
+| 前端边缘页面 | `ClientApp/src/views/iot/edge/*`、`ClientApp/src/api/edge/index.ts` | 已存在，但列表页仍使用 fast-crud |
+
+### 10.2 修正后的实施入口
+
+当前无实施入口。若后续重新纳入边缘网关，应重新确认：
+
+1. 是否仍需要边缘 JSON payload 版本和字段映射规范。
+2. 是否复用 `EdgeController`，或新增专用 HTTP 批量遥测入口。
+3. 是否继续兼容 MQTT `GatewayController.telemetry()` 的 ThingsBoard 风格批量格式。
+4. 是否需要前端边缘节点页面和诊断页面。
+
+### 10.3 Agent 验收标准
+
+当前阶段无验收项。后续重新启用本模块时再补充验收标准。

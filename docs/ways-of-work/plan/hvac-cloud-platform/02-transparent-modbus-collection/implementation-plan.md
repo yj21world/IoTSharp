@@ -368,3 +368,35 @@ public class TransformDto
 - `GatewaySchedulerManager` / `GatewayScheduler` — 调度逻辑满足需求。
 - `ModbusMqttTransport` — MQTT 传输层功能完整。
 - `BatchMerger.Merge` — 合并逻辑正确，仅在调用处增加 `Optimize()`。
+
+## 10. 代码验证审核补充（2026-04-28）
+
+本计划早期版本按“新建多个 Controller”描述实施路径，但当前代码已演进为集中式实现。后续 agent 不应再按第 3、6、7 节直接新建并行 Controller，避免重复 API 面和路由分裂。
+
+### 10.1 当前真实代码状态
+
+| 能力 | 当前代码 | 审核结论 |
+|------|----------|----------|
+| 采集任务 CRUD | `IoTSharp/Controllers/CollectionTaskController.cs`、`IoTSharp/Services/CollectionTaskService.cs` | 已实现，路由为 `api/CollectionTask/[action]` |
+| 采集设备/点位编辑 | `CollectionTaskDto.Devices/Points`、`CollectionTaskService.CreateFromDtoAsync/UpdateFromDtoAsync` | 已通过任务 DTO 聚合提交，不是独立 Controller |
+| 采集日志查询 | `CollectionTaskController.GetLogs`、`CollectionTaskService.GetLogsAsync` | 已实现，但返回 `ApiResult<object>`，建议收敛到 `ApiResult<PagedData<CollectionLogDto>>` |
+| 草稿/校验/预览 | `GetDraft`、`ValidateDraft`、`Preview` | 已实现，可作为前端编辑器入口 |
+| 调度批量合并 | `GatewayScheduler.ProcessQueueAsync` 调用 `_batchMerger.Merge(tempList)` | 未调用 `Optimize()`，仍是 P0 待改 |
+| 超时处理 | `ModbusCollectionService.SendModbusRequestAsync` 超时后写 `CollectionLog` | 已有超时日志，但未使用 `CollectionConnectionDto.RetryCount` 做即时重试 |
+| 前端页面 | `ClientApp/src/views/iot/collectiontask/*`、`ClientApp/src/api/collectiontask/index.ts` | 已有 Element Plus 显式实现雏形，可继续完善 |
+
+### 10.2 修正后的实施入口
+
+1. **不要新建** `CollectionDeviceController`、`CollectionPointController`、`CollectionLogController`，除非先形成兼容迁移方案。
+2. 在 `GatewayScheduler.ProcessQueueAsync` 中将 `Merge(tempList)` 的结果传入 `Optimize()`，并补充合并前后批次数测试。
+3. 读取 `CollectionTask.ConnectionJson` 中的 `RetryCount`，决定是否在 `SendModbusRequestAsync` 中做即时重试；若暂不做，需在 PRD/计划中明确“RetryCount 仅保留配置，不生效”。
+4. 将 `GetLogs` 返回类型从 `ApiResult<object>` 收敛为 `ApiResult<PagedData<CollectionLogDto>>`，失败返回空分页对象。
+5. 补 `IoTSharp.Test` 覆盖：任务创建/更新、点位生成、日志查询、超时日志、批量合并优化。
+
+### 10.3 Agent 验收标准
+
+- 创建采集任务后，`CollectionTask`、`CollectionDevice`、`CollectionPoint` 均正确入库。
+- 相邻同类寄存器点位经过 `BatchMerger.Optimize()` 后减少请求批次。
+- 网关超时后写入 `CollectionLog.Status = Timeout`，并能通过日志 API 查询。
+- 前端采集任务页面不引入 `fs-crud/@fast-crud`。
+- 新增/调整 API 均按 `ApiResult<PagedData<T>>` 约定返回。

@@ -1,275 +1,349 @@
-# Implementation Plan：点位、模板与映射模块
+# Implementation Plan：设备大类与点位模板应用
 
-> 对应 PRD：[点位、模板与映射模块 PRD](../04-point-template-mapping/prd.md)
-> 状态：**实体已有，待实现业务逻辑和 API**
+> 对应 PRD：[设备大类与点位模板应用 PRD](./prd.md)
+> 状态：**收敛实施范围：移除公开设备角色字段，设备大类表按 DeviceCategories 设计**
 
-## 1. 实施概述
+## 1. Goal
 
-此模块建立在现有 `DeviceTypeProfile`、`CollectionRuleTemplate`、`ProduceDataMapping` 实体之上。核心工作是添加 CRUD API 和"模板应用到设备"的生成逻辑，不涉及新的运行时服务。
+本功能将历史点位模板概念收敛为“设备大类”，用于同类物理设备的点位模板复用。公开模型中直接移除普通设备/网关角色字段，不再把普通设备/网关作为设备属性暴露。若 EF 继承映射仍需区分 `Device` / `Gateway`，仅使用内部 shadow discriminator（当前为 `DeviceRole`），业务代码通过 `device is Gateway` 或 `_context.Gateway` 判断。设备大类关联是可选的，未关联设备大类的设备不得触发模板应用、采集任务生成或其它大类逻辑。
 
-## 2. 涉及文件
+## 2. Requirements
 
-| 优先级 | 文件 | 动作 |
-|--------|------|------|
-| P0 | `IoTSharp/Controllers/DeviceTypeProfileController.cs` | **新建** |
-| P0 | `IoTSharp/Services/DeviceTypeProfileService.cs` | **审查/完善** — 模板应用逻辑 |
-| P1 | `IoTSharp/Controllers/CollectionRuleTemplateController.cs` | **新建** |
-| P2 | `IoTSharp/Controllers/ProduceDataMappingController.cs` | **新建** |
-| P3 | `ClientApp/` | 模板管理页面 |
+- 删除旧公开设备角色字段、`Produce` 默认设备角色字段、相关 DTO 字段、枚举和前端表单项。
+- EF 继承映射改用内部 `DeviceRole` shadow discriminator，不能暴露到业务 API。
+- 将用户可见概念统一为“设备大类”。
+- 数据库表使用 `DeviceCategories`，代码层使用 `DeviceCategory` 实体、服务、控制器和 DTO 命名。
+- 复用 `CollectionRuleTemplate` 作为设备大类下的点位模板。
+- 允许 `Device.DeviceCategoryId` 为空。
+- 当设备未显式选择或应用设备大类时，不得自动创建采集任务和点位。
+- 当设备大类禁用时，`ApplyProfile` 必须返回错误。
+- 模板应用必须幂等：按 `PointKey` 更新已有点位，新增缺失点位，不重复创建。
+- 模板应用必须在事务中完成。
+- API 返回结构遵守 `ApiResult<PagedData<T>>`，失败返回空分页对象。
+- 前端页面使用 Element Plus 显式组件，不使用 fast-crud。
 
-## 3. 模板应用逻辑（核心）
+## 3. Technical Considerations
 
-```csharp
-// IoTSharp/Services/DeviceTypeProfileService.cs
-public class DeviceTypeProfileService
-{
-    private readonly ApplicationDbContext _dbContext;
+### 3.1 System Architecture Overview
 
-    /// <summary>
-    /// 将设备类型模板应用到目标设备，自动生成 CollectionPoint 记录。
-    /// </summary>
-    public async Task<ApplyResult> ApplyToDevice(Guid profileId, Guid deviceId)
-    {
-        var profile = await _dbContext.DeviceTypeProfiles
-            .Include(p => p.Points)
-            .FirstOrDefaultAsync(p => p.Id == profileId);
-        if (profile == null)
-            return ApplyResult.Fail("DeviceTypeProfile not found");
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend Layer"]
+        CategoryList["设备大类列表"]
+        CategoryForm["设备大类表单"]
+        RuleEditor["点位模板编辑器"]
+        DeviceForm["设备表单：可选设备大类"]
+        ApplyAction["应用模板操作"]
+    end
 
-        var device = await _dbContext.Device.FindAsync(deviceId);
-        if (device == null)
-            return ApplyResult.Fail("Device not found");
+    subgraph API["API Layer"]
+        DeviceCategoryController["DeviceCategoryController<br/>显示为设备大类 API"]
+        DevicesController["DevicesController<br/>设备 CRUD"]
+    end
 
-        // 找到该设备关联的 CollectionTask 和 CollectionDevice
-        var collectionDevice = await _dbContext.CollectionDevices
-            .FirstOrDefaultAsync(cd => cd.DeviceId == deviceId);
-        if (collectionDevice == null)
-            return ApplyResult.Fail("Device is not associated with a CollectionDevice");
+    subgraph Service["Business Logic Layer"]
+        DeviceCategoryService["DeviceCategoryService"]
+        ApplyProfile["ApplyProfileToDeviceAsync"]
+        Guard["空大类/禁用大类保护"]
+        SyncPoints["幂等同步 CollectionPoint"]
+    end
 
-        int created = 0;
-        int skipped = 0;
+    subgraph Data["Data Layer"]
+        Device["Device<br/>DeviceCategoryId nullable"]
+        DeviceCategory["DeviceCategories<br/>设备大类"]
+        CollectionRuleTemplate["CollectionRuleTemplate<br/>点位模板"]
+        CollectionTask["CollectionTask"]
+        CollectionDevice["CollectionDevice"]
+        CollectionPoint["CollectionPoint"]
+    end
 
-        foreach (var pointDef in profile.Points)
-        {
-            // 检查是否已存在同名点位（允许覆盖或跳过）
-            var existing = await _dbContext.CollectionPoints
-                .FirstOrDefaultAsync(p => p.CollectionDeviceId == collectionDevice.Id
-                    && p.TargetName == pointDef.TargetName);
-            if (existing != null)
-            {
-                // 策略：跳过已存在的点位，记录 skipped 数量
-                skipped++;
-                continue;
-            }
+    CategoryList --> DeviceCategoryController
+    CategoryForm --> DeviceCategoryController
+    RuleEditor --> DeviceCategoryController
+    DeviceForm --> DevicesController
+    ApplyAction --> DeviceCategoryController
+    DeviceCategoryController --> DeviceCategoryService
+    DeviceCategoryService --> Guard
+    Guard --> ApplyProfile
+    ApplyProfile --> SyncPoints
+    SyncPoints --> Device
+    SyncPoints --> DeviceCategory
+    SyncPoints --> CollectionRuleTemplate
+    SyncPoints --> CollectionTask
+    SyncPoints --> CollectionDevice
+    SyncPoints --> CollectionPoint
+```
 
-            var point = new CollectionPoint
-            {
-                CollectionDeviceId = collectionDevice.Id,
-                SlaveId = pointDef.SlaveId,
-                FunctionCode = pointDef.FunctionCode,
-                Address = pointDef.Address,
-                Quantity = pointDef.Quantity,
-                RawDataType = pointDef.RawDataType,
-                ByteOrder = pointDef.ByteOrder,
-                ReadPeriodMs = pointDef.ReadPeriodMs,
-                TransformsJson = pointDef.TransformsJson,
-                TargetDeviceId = deviceId,
-                TargetName = pointDef.TargetName,
-                TargetType = pointDef.TargetType
-            };
-            _dbContext.CollectionPoints.Add(point);
-            created++;
-        }
+### 3.2 Technology Stack Selection
 
-        // 记录模板应用到设备的关系
-        device.DeviceTypeProfileId = profileId;
-        await _dbContext.SaveChangesAsync();
+- 后端：ASP.NET Core Controller + EF Core，沿用仓库现有模式。
+- 数据模型：数据库表收敛为 `DeviceCategories` + `CollectionRuleTemplate`；服务类名可先复用 `DeviceCategoryService`，后续单独重命名。
+- 前端：Vue 3 + Element Plus 显式表格、表单、抽屉或弹窗。
+- 测试：沿用 `IoTSharp.Test` 的 xUnit 风格，补服务层和 API 合同测试。
 
-        return ApplyResult.Success(created, skipped);
+### 3.3 Integration Points
+
+- `DevicesController`：设备新增/编辑时允许 `DeviceCategoryId` 为空或设置为某个设备大类。
+- `DeviceCategoryController`：保留现有路由，前端文案显示为设备大类。
+- `DeviceCategoryService.ApplyProfileToDeviceAsync`：加入空关联、禁用大类和事务保护。
+- `CollectionTaskService` / 采集运行时：不直接改运行时，只确保生成的任务和点位符合现有结构。
+
+### 3.4 Deployment Architecture
+
+无需新增服务或容器。若修改 DTO、枚举、公共接口签名，必须按项目约定执行停止进程、`dotnet clean`、全量 `dotnet build`、重新启动。
+
+### 3.5 Scalability Considerations
+
+第一阶段按单体单实例设计。模板应用是低频配置操作，不进入高并发路径。需要通过数据库索引保证按 `ProfileId` 查询点位模板、按 `DeviceId/PointKey` 查找点位的效率。
+
+## 4. Database Schema Design
+
+### 4.1 ER Diagram
+
+```mermaid
+erDiagram
+    Device {
+        guid Id
+        string Name
+        guid DeviceCategoryId nullable
     }
-}
 
-public class ApplyResult
-{
-    public bool Success { get; set; }
-    public string? Error { get; set; }
-    public int Created { get; set; }
-    public int Skipped { get; set; }
-
-    public static ApplyResult Fail(string error) => new() { Success = false, Error = error };
-    public static ApplyResult Success(int created, int skipped) => new() { Success = true, Created = created, Skipped = skipped };
-}
-```
-
-## 4. DeviceTypeProfileController
-
-```csharp
-// 新建: IoTSharp/Controllers/DeviceTypeProfileController.cs
-[ApiController]
-[Route("api/[controller]")]
-[Authorize]
-public class DeviceTypeProfileController : ControllerBase
-{
-    private readonly ApplicationDbContext _dbContext;
-    private readonly DeviceTypeProfileService _profileService;
-
-    // GET /api/device-type-profiles
-    [HttpGet]
-    public async Task<ApiResult<PagedData<DeviceTypeProfileDto>>> GetProfiles(
-        [FromQuery] string? keyword, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
-    { /* 实现 */ }
-
-    // GET /api/device-type-profiles/{id}
-    [HttpGet("{id}")]
-    public async Task<ApiResult<DeviceTypeProfileDto>> GetProfile(Guid id)
-    { /* 实现 — 含点位列表和关联产品 */ }
-
-    // POST /api/device-type-profiles
-    [HttpPost]
-    public async Task<ApiResult<DeviceTypeProfile>> CreateProfile([FromBody] DeviceTypeProfileCreateDto dto)
-    { /* 实现 */ }
-
-    // PUT /api/device-type-profiles/{id}
-    [HttpPut("{id}")]
-    public async Task<ApiResult<DeviceTypeProfile>> UpdateProfile(Guid id, [FromBody] DeviceTypeProfileUpdateDto dto)
-    { /* 实现 */ }
-
-    // DELETE /api/device-type-profiles/{id}
-    [HttpDelete("{id}")]
-    public async Task<ApiResult<bool>> DeleteProfile(Guid id)
-    { /* 实现 — 检查是否有关联设备在使用 */ }
-
-    // GET /api/device-type-profiles/{id}/points — 模板中的点位定义列表
-    [HttpGet("{id}/points")]
-    public async Task<ApiResult<List<PointDefinitionDto>>> GetPoints(Guid id)
-    { /* 实现 */ }
-
-    // POST /api/device-type-profiles/{id}/points — 向模板添加点位定义
-    [HttpPost("{id}/points")]
-    public async Task<ApiResult<PointDefinition>> AddPoint(Guid id, [FromBody] PointDefinitionCreateDto dto)
-    { /* 实现 */ }
-
-    // DELETE /api/device-type-profiles/{id}/points/{pointId}
-    [HttpDelete("{id}/points/{pointId}")]
-    public async Task<ApiResult<bool>> RemovePoint(Guid id, Guid pointId)
-    { /* 实现 */ }
-
-    // POST /api/device-type-profiles/{id}/apply/{deviceId} — 将模板应用到设备
-    [HttpPost("{id}/apply/{deviceId}")]
-    public async Task<ApiResult<ApplyResult>> ApplyToDevice(Guid id, Guid deviceId)
-    {
-        var result = await _profileService.ApplyToDevice(id, deviceId);
-        if (!result.Success)
-            return new ApiResult<ApplyResult>(ApiCode.Error, result.Error, result);
-        return new ApiResult<ApplyResult>(ApiCode.Success, result);
+    DeviceCategory {
+        guid Id
+        string ProfileKey
+        string ProfileName
+        enum HvacCategory
+        bool Enabled
+        int Version
     }
+
+    CollectionRuleTemplate {
+        guid Id
+        guid ProfileId
+        string PointKey
+        string PointName
+        byte FunctionCode
+        ushort Address
+        ushort RegisterCount
+        string RawDataType
+        string TargetName
+        string TargetType
+    }
+
+    CollectionTask {
+        guid Id
+        string TaskKey
+        guid GatewayDeviceId
+    }
+
+    CollectionDevice {
+        guid Id
+        guid TaskId
+        string DeviceKey
+    }
+
+    CollectionPoint {
+        guid Id
+        guid DeviceId
+        string PointKey
+        guid TargetDeviceId
+    }
+
+    DeviceCategory ||--o{ CollectionRuleTemplate : contains
+    DeviceCategory ||--o{ Device : optional_category
+    CollectionTask ||--o{ CollectionDevice : contains
+    CollectionDevice ||--o{ CollectionPoint : contains
+```
+
+### 4.2 Table Specifications
+
+- `Device.DeviceCategoryId`：可空，表示设备是否关联设备大类。
+- `DeviceCategories`：设备大类表，承载大类基础信息和点位模板入口。
+- `DeviceCategories.HvacCategory`：暖通业务大类枚举，不是普通设备/网关角色。
+- `CollectionRuleTemplates.ProfileId`：关联设备大类。
+- `CollectionPoints.PointKey`：用于模板应用幂等同步。
+
+### 4.3 Indexing Strategy
+
+- 确认 `DeviceCategories.ProfileKey` 有唯一索引。
+- 确认 `DeviceCategories.HvacCategory` 和 `DeviceCategories.Enabled` 有查询索引。
+- 确认 `CollectionRuleTemplates.ProfileId` 有索引。
+- 建议增加或确认 `CollectionPoints.DeviceId + PointKey` 的查询效率；若现有模型不支持唯一约束，先在服务层防重复。
+
+### 4.4 Migration Strategy
+
+迁移需要执行：
+
+- 新增内部 `DeviceRole` 判别列，并从旧设备角色列数据迁移 `0 -> Device`、`1 -> Gateway`。
+- 删除旧设备角色列和 `Produce` 默认设备角色列。
+- 将设备大类表统一为 `DeviceCategories`。
+- 将设备大类的暖通业务分类列统一为 `HvacCategory`。
+- 保留 `Device.DeviceCategoryId` 可空外键列。
+
+## 5. API Design
+
+### 5.1 设备大类列表
+
+- Method: `GET`
+- Route: `api/DeviceCategory/GetAll`
+- Response: `ApiResult<PagedData<DeviceCategoryDto>>`
+- 说明：复用现有 Controller，前端展示为设备大类。
+
+### 5.2 设备大类详情
+
+- Method: `GET`
+- Route: `api/DeviceCategory/Get/{id}`
+- Response: `ApiResult<PagedData<DeviceCategoryDto>>`
+- 要求：若不存在，返回 `{ total: 0, rows: [] }`。
+
+### 5.3 创建设备大类
+
+- Method: `POST`
+- Route: `api/DeviceCategory/Create`
+- Request: `CreateDeviceCategoryDto`
+- Response: `ApiResult<PagedData<DeviceCategoryDto>>`
+
+### 5.4 维护点位模板
+
+- Routes: 复用 `GetRules`、`AddRule`、`UpdateRule`、`DeleteRule`
+- Response: `ApiResult<PagedData<CollectionRuleTemplateDto>>`
+- 要求：失败场景返回空分页对象。
+
+### 5.5 设备关联设备大类
+
+- 可在设备新增/编辑 DTO 中增加或确认 `DeviceCategoryId`。
+- 未传时保存为空，不触发模板应用。
+
+### 5.6 应用模板
+
+- Method: `POST`
+- Route: `api/DeviceCategory/ApplyProfile`
+- Request:
+
+```ts
+interface ApplyDeviceCategoryDto {
+  deviceId: string;
+  profileId?: string;
 }
 ```
 
-## 5. 点位定义 DTO
+- 行为：
+  - `profileId` 为空时，从设备当前 `DeviceCategoryId` 读取。
+  - 两者都为空时返回错误，且不创建任何记录。
+  - 设备大类禁用时返回错误。
+  - 成功时返回应用结果分页对象。
 
-```csharp
-// PointDefinition — 模板中的点位定义（不同于 CollectionPoint 运行时实体）
-public class PointDefinitionCreateDto
-{
-    public string TargetName { get; set; }       // 遥测键名（如 "frequency"）
-    public string? TargetType { get; set; }       // "Telemetry" | "Attribute"
-    public string DisplayName { get; set; }       // 显示名称（如 "运行频率"）
-    public string? Unit { get; set; }             // 单位（如 "Hz"）
-    
-    // Modbus 参数
-    public byte SlaveId { get; set; }
-    public byte FunctionCode { get; set; }
-    public ushort Address { get; set; }
-    public ushort Quantity { get; set; } = 1;
-    public string RawDataType { get; set; }       // "float32" / "uint16" / "int16" / etc.
-    public string? ByteOrder { get; set; }
-    public int ReadPeriodMs { get; set; } = 30000;
-    
-    // 变换管道
-    public List<TransformDto>? Transforms { get; set; }
-}
+## 6. Frontend Architecture
+
+### 6.1 Component Hierarchy
+
+```text
+设备大类页面
+├── 查询区
+│   ├── 名称输入
+│   ├── 启用状态选择
+│   └── 查询/重置按钮
+├── 操作区
+│   ├── 新增设备大类
+│   └── 刷新
+├── 设备大类表格
+│   ├── 大类名称
+│   ├── 暖通分类
+│   ├── 启用状态
+│   ├── 点位数量
+│   └── 编辑/点位/删除
+├── 设备大类表单抽屉
+└── 点位模板编辑抽屉
 ```
 
-## 6. CollectionRuleTemplateController
+设备表单：
 
-```csharp
-// 新建: IoTSharp/Controllers/CollectionRuleTemplateController.cs
-[ApiController]
-[Route("api/[controller]")]
-[Authorize]
-public class CollectionRuleTemplateController : ControllerBase
-{
-    // GET — 模板列表
-    [HttpGet]
-    public async Task<ApiResult<List<CollectionRuleTemplateDto>>> GetTemplates()
-    { /* 实现 */ }
-
-    // POST — 创建模板
-    [HttpPost]
-    public async Task<ApiResult<CollectionRuleTemplate>> CreateTemplate([FromBody] CollectionRuleTemplateCreateDto dto)
-    { /* 实现 */ }
-
-    // PUT — 更新模板
-    [HttpPut("{id}")]
-    public async Task<ApiResult<CollectionRuleTemplate>> UpdateTemplate(Guid id, [FromBody] CollectionRuleTemplateUpdateDto dto)
-    { /* 实现 */ }
-
-    // DELETE — 删除模板（检查引用）
-    [HttpDelete("{id}")]
-    public async Task<ApiResult<bool>> DeleteTemplate(Guid id)
-    { /* 实现 */ }
-}
+```text
+设备新增/编辑
+├── 基础信息
+├── 接入身份
+├── 设备大类（可空）
+└── 保存
 ```
 
-## 7. ProduceDataMappingController
+设备详情：
 
-```csharp
-// 新建: IoTSharp/Controllers/ProduceDataMappingController.cs
-[ApiController]
-[Route("api/[controller]")]
-[Authorize]
-public class ProduceDataMappingController : ControllerBase
-{
-    // GET — 映射规则列表（按产品过滤）
-    [HttpGet]
-    public async Task<ApiResult<List<ProduceDataMappingDto>>> GetMappings([FromQuery] Guid? produceId)
-    { /* 实现 */ }
-
-    // POST — 创建映射规则
-    [HttpPost]
-    public async Task<ApiResult<ProduceDataMapping>> CreateMapping([FromBody] ProduceDataMappingCreateDto dto)
-    { /* 实现 */ }
-
-    // DELETE — 删除映射规则
-    [HttpDelete("{id}")]
-    public async Task<ApiResult<bool>> DeleteMapping(Guid id)
-    { /* 实现 */ }
-}
+```text
+设备详情
+├── 基础信息
+├── 设备大类状态
+└── 应用模板按钮（仅关联设备大类时可用）
 ```
 
-## 8. 前端实施要点
+### 6.2 State Flow
 
+```mermaid
+stateDiagram-v2
+    [*] --> LoadCategories
+    LoadCategories --> EditingCategory
+    LoadCategories --> EditingRules
+    LoadCategories --> DeviceForm
+    DeviceForm --> NoCategory: category empty
+    DeviceForm --> CategoryLinked: category selected
+    CategoryLinked --> ApplyTemplate
+    ApplyTemplate --> Applied
+    ApplyTemplate --> Failed
 ```
-ClientApp/src/views/templates/
-├── DeviceTypeProfileList.vue       // 设备类型模板列表
-├── DeviceTypeProfileForm.vue       // 创建/编辑模板
-├── PointDefinitionList.vue         // 模板点位管理（表格 + 添加）
-└── ApplyProfileDialog.vue          // 模板应用到设备对话框
-```
 
-## 9. 实施步骤
+### 6.3 Reusable Components
 
-1. 审查 `DeviceTypeProfile` 实体字段 — 确认是否满足暖通点位定义需求。
-2. 创建 `PointDefinition` 实体（如果当前 `DeviceTypeProfile` 中尚无点位定义导航属性）。
-3. 实现 `DeviceTypeProfileService.ApplyToDevice` 方法（核心逻辑）。
-4. 创建 `DeviceTypeProfileController`。
-5. 创建 `CollectionRuleTemplateController`（简单 CRUD）。
-6. 创建 `ProduceDataMappingController`（简单 CRUD）。
-7. 实现前端模板管理页面。
-8. 端到端测试：创建模板 → 添加点位 → 应用到设备 → 验证 CollectionPoint 生成。
+- `DeviceCategoryTable.vue`
+- `DeviceCategoryForm.vue`
+- `CollectionRuleTemplateEditor.vue`
+- `ApplyDeviceCategoryDialog.vue`
 
-## 10. 不需要改动
+### 6.4 State Management
 
-- `DeviceTypeProfile` / `CollectionRuleTemplate` / `ProduceDataMapping` 实体核心字段 — 除非审查发现字段不足。
-- Modbus 采集运行时 — 模板应用仅生成 DB 记录，不影响运行时调度。
+第一阶段使用组件本地 `ref/reactive` 状态即可。API 封装放在 `ClientApp/src/api/devicecategory/index.ts`，避免直接在组件中拼 URL。
+
+## 7. Security Performance
+
+- 所有设备大类和模板 API 必须 `[Authorize]`。
+- 应用模板时必须校验设备属于当前租户/客户。
+- 应用模板时必须校验设备大类可用。
+- 点位模板输入必须校验功能码、寄存器地址、寄存器数量、轮询周期和 key 格式。
+- 模板应用使用事务，避免部分点位写入。
+- 未关联设备大类时不查询模板、不生成任务、不写点位，保证无副作用。
+
+## 8. Implementation Steps
+
+1. 后端审查 `DeviceCategory` / `CollectionRuleTemplate` 字段，确认第一阶段无需迁移。
+2. 调整 DTO 命名或新增别名 DTO，使 API 语义表现为设备大类。
+3. 调整 `DeviceCategoryController` 返回结构，新增/更新/详情统一返回 `PagedData`。
+4. 调整设备新增/编辑 DTO 和 Controller，支持 `DeviceCategoryId` 可空保存。
+5. 调整 `DeviceCategoryService.ApplyProfileToDeviceAsync`：
+   - 空设备大类直接失败。
+   - 禁用设备大类直接失败。
+   - 使用事务。
+   - 按 `PointKey` 幂等同步点位。
+6. 前端新增或重做设备大类页面，使用 Element Plus 显式组件。
+7. 设备新增/编辑页面增加可空设备大类选择。
+8. 设备详情增加应用模板入口，仅在已关联设备大类时可用。
+9. 补测试：
+   - 未关联设备大类不触发模板。
+   - 关联后应用生成点位。
+   - 重复应用不重复创建。
+   - 禁用设备大类不能应用。
+   - 租户/客户越权不能应用。
+10. 修改 DTO 或公共接口后执行完整 clean/build。
+
+## 9. Verification
+
+- `dotnet clean`
+- `dotnet build`
+- 后端测试：`dotnet test IoTSharp.Test/IoTSharp.Test.csproj`
+- 前端如修改页面：执行项目现有前端检查命令，若无统一命令则至少启动本地页面验证关键路径。
+
+## 10. Out of Scope
+
+- 不保留公开设备角色字段。
+- 不重命名数据库表。
+- 不做 Produce 重构。
+- 不做边缘 JSON 映射。
+- 不做告警/规则/控制模板自动生成。
+- 不做模板版本历史和自动级联同步。

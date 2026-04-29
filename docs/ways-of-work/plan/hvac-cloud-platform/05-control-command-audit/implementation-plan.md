@@ -304,3 +304,34 @@ ClientApp/src/views/commands/
 - MQTT Broker 配置 — 已支持 RPC Topic 路由。
 - 完整状态机 — 推迟到后续阶段。
 - 控制模板机制 — 推迟到后续阶段。
+
+## 11. 代码验证审核补充（2026-04-28）
+
+本模块仍是第一阶段最关键缺口之一。当前代码有 RPC 下发能力，但还不能满足 PRD 中“命令生命周期、审计、查询、失败可见性”的要求。
+
+### 11.1 当前真实代码状态
+
+| 能力 | 当前代码 | 审核结论 |
+|------|----------|----------|
+| HTTP RPC 下发 | `DevicesController.Rpc` | 已存在，但返回 `ActionResult<string>`，不具备命令日志 |
+| MQTT RPC 响应 | `IoTSharp/Services/MQTTControllers/RpcController.cs` | 已存在 |
+| RPC 客户端 | `IoTSharp/Extensions/RpcClient.cs` | 已存在，需要审查超时、订阅释放和错误语义 |
+| 审计基础 | `IoTSharp.Data/AuditLog.cs` | 已存在通用审计实体，但没有控制命令专用状态 |
+| 命令日志 | 无 `CommandLog` | 仍需新增 |
+| 命令服务/API | 无 `CommandService` / `CommandController` | 仍需新增 |
+
+### 11.2 修正后的实施入口
+
+1. 新增 `CommandLog` 实体、EF 配置和迁移，字段至少包含设备、操作者、方法、参数、状态、错误、响应、耗时、创建时间。
+2. 新增 `CommandService`，复用现有 `RpcClient`，不要绕过已有 MQTT RPC 通道。
+3. 新增 `CommandController`，路由遵循仓库风格 `api/Command/[action]` 或明确采用 REST 风格并同步前端 API 封装。
+4. 下发接口返回 `ApiResult<PagedData<CommandLogDto>>`，新增/更新失败返回空分页对象。
+5. 权限校验第一阶段至少校验用户和设备的租户/客户范围；高风险写命令后续再接控制模板。
+6. 在设备详情页新增命令面板和命令历史，使用 Element Plus 显式组件。
+
+### 11.3 Agent 验收标准
+
+- 授权用户下发命令后，无论成功、失败或超时，均能查询到 `CommandLog`。
+- 设备不存在、无权限、RPC 超时均返回统一结构并记录失败原因。
+- 命令历史可按设备、状态、命令类型和时间过滤。
+- 不破坏现有 `DevicesController.Rpc` 和 MQTT RPC Topic。

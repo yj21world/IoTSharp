@@ -6,7 +6,7 @@
 
 当前仓库采用单体承载、多模块分层的 ASP.NET Core 架构。`IoTSharp` 主应用同时承载 HTTP API、静态前端入口、内置 MQTT Broker、CoAP 服务、Quartz 定时任务、CAP 事件总线订阅、MCP HTTP 入口和后台采集服务。经过前期精简后，运行时已收敛为 PostgreSQL 关系库、CAP 事件总线、RabbitMQ 消息中间件，以及 TimescaleDB 或 InfluxDB 时序存储。部分历史项目和预留模块仍存在，但不应继续扩大其业务依赖。
 
-长期架构策略是不推翻现有 IoTSharp 投资，在现有设备、产品、遥测、属性、规则、告警、租户和资产模型之上，新增并强化暖通场景需要的“网关接入、Modbus 采集、边缘 JSON 接入、业务设备聚合、控制命令、能耗统计”能力。系统应先完成核心数据与控制闭环，再逐步补齐权限、组态、高级规则和能效分析。
+长期架构策略是不推翻现有 IoTSharp 投资，在现有设备、产品、遥测、属性、规则、告警、租户和资产模型之上，新增并强化暖通场景需要的“网关接入、Modbus 采集、业务设备聚合、控制命令、能耗统计”能力。当前阶段暂不考虑边缘采集网关和边缘 JSON 接入。系统应先完成核心数据与控制闭环，再逐步补齐权限、组态、高级规则和能效分析。
 
 ## 2. 系统架构图
 
@@ -17,7 +17,7 @@ flowchart TB
     subgraph Field["现场设备与网关层"]
         ModbusDevices["Modbus/IO 设备<br/>主机/水泵/阀门/电表/传感器"]
         TransparentGateway["透传网关<br/>MQTT 转发 Modbus 数据"]
-        EdgeGateway["边缘采集网关<br/>本地采集并上传 JSON"]
+        EdgeGateway["边缘采集网关<br/>长期预留，当前不处理"]
         MQTTDevice["少量 MQTT 设备"]
         ModbusDevices <--> TransparentGateway
         ModbusDevices --> EdgeGateway
@@ -33,7 +33,7 @@ flowchart TB
         Auth["认证授权<br/>ASP.NET Core Identity + JWT"]
         DeviceMgmt["设备/网关/产品/资产管理"]
         Collection["Modbus 采集运行时<br/>ModbusCollectionService"]
-        Mapping["点位/模板/映射服务<br/>CollectionTaskService<br/>DeviceTypeProfileService"]
+        Mapping["点位/模板/映射服务<br/>CollectionTaskService<br/>DeviceCategoryService"]
         Telemetry["遥测与属性处理"]
         Command["RPC/控制命令通道"]
         Rules["规则链与告警<br/>FlowRuleProcessor"]
@@ -98,7 +98,7 @@ flowchart LR
         Sensor["温度/压力/流量传感器"]
         IO["IO 模块"]
         TG["透传网关"]
-        EG["边缘采集网关"]
+        EG["边缘采集网关<br/>长期预留"]
         Chiller <--> TG
         Pump <--> TG
         Meter --> EG
@@ -111,7 +111,7 @@ flowchart LR
         AccessAdapter["协议接入适配<br/>HTTP/MQTT/CoAP"]
         GatewayRuntime["网关运行时<br/>在线/心跳/通道状态"]
         ModbusRuntime["云端 Modbus 采集运行时<br/>请求生成/响应解析/批量调度"]
-        EdgeJsonRuntime["边缘 JSON 接入运行时<br/>校验/版本/字段映射"]
+        EdgeJsonRuntime["边缘 JSON 接入运行时<br/>长期预留，当前不处理"]
         PointModel["点位与模板模型<br/>采集点/解析规则/控制点"]
         EquipmentModel["业务设备模型<br/>水泵/主机/阀门/电表/传感器"]
         TelemetryStore["实时与历史数据服务"]
@@ -182,14 +182,14 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Gateway as 边缘采集网关
+    participant Gateway as 边缘采集网关（长期预留）
     participant API as HTTP/MQTT 接入
     participant Mapper as JSON 映射服务
     participant Latest as 最新值
     participant History as 历史时序库
     participant Equipment as 业务设备视图
 
-    Gateway->>API: 上传 JSON 数据
+    Gateway->>API: 上传 JSON 数据（当前不处理）
     API->>Mapper: 校验格式与版本
     Mapper->>Mapper: 字段映射到遥测点
     Mapper->>Latest: 写入最新值
@@ -203,8 +203,8 @@ sequenceDiagram
 
 - **设备与网关管理**：延续 `Device`、`Gateway`、`DeviceIdentity`、`Produce` 等核心模型，强化网关类型、通信状态、下级设备关联和产品模板能力。
 - **透传网关采集**：以现有 `ModbusCollectionService`、`CollectionTask`、`CollectionDevice`、`CollectionPoint`、`CollectionLog` 为基础，完善云端 Modbus 请求生成、MQTT 下发、响应接收、解析和日志闭环。
-- **边缘 JSON 接入**：在 HTTP/MQTT 接入层增加边缘网关 JSON 数据格式、版本、字段映射和错误诊断机制。
-- **点位与模板体系**：继续发展 `DeviceTypeProfile`、`CollectionRuleTemplate`、`ProduceDataMapping` 等模型，形成可复用的设备类型模板、采集点模板和控制点模板。
+- **边缘 JSON 接入**：当前阶段暂不处理。已有 MQTT/HTTP JSON 接入能力保留，但不新增边缘网关 JSON 格式、版本、字段映射和错误诊断机制。
+- **设备大类与点位模板体系**：继续发展 `DeviceCategory`、`CollectionRuleTemplate` 等模型，第一阶段把 `DeviceCategory` 收敛为设备大类承载，仅处理 Modbus 点位模板应用；未关联设备大类的设备不触发模板逻辑。
 - **业务设备聚合**：在现有 `Asset`、`AssetRelation`、`Device` 基础上引入暖通业务设备视图，用于表达水泵、主机、阀门、电表、传感器等运维对象。
 - **实时与历史数据**：继续使用 `TelemetryLatest`、`AttributeLatest` 表示最新值，使用 `TelemetryData` 和时序存储承载历史数据。
 - **控制命令运行时**：复用 MQTT RPC 和现有控制通道，补齐命令模板、命令实例、状态机、超时处理、审计记录和失败反馈。
@@ -216,7 +216,7 @@ sequenceDiagram
 
 - **运行时收敛**：继续保持当前约束，关系数据库仅支持 PostgreSQL，事件总线仅支持 CAP，消息中间件仅支持 RabbitMQ，时序存储仅支持 TimescaleDB 或 InfluxDB。
 - **协议接入边界**：HTTP Controller、MQTT Controller、CoAP Service 只负责接入、认证、基础校验和路由，不承载复杂业务编排。
-- **采集运行时边界**：Modbus 采集、JSON 映射、命令执行、能耗统计应独立成服务边界，避免堆积在 Controller。
+- **采集运行时边界**：Modbus 采集、命令执行、能耗统计应独立成服务边界，避免堆积在 Controller；边缘 JSON 映射当前暂不处理。
 - **异步事件边界**：遥测入库、告警判断、规则链触发、控制状态变更通过 CAP 事件串联，降低同步请求链路长度。
 - **模型边界**：底层通信设备、采集点位、业务设备、能耗统计对象需要分层建模，避免把所有信息塞进 `Device`。
 - **可观测性**：采集响应、解析失败、命令超时、网关掉线必须有结构化日志和查询入口。
@@ -276,6 +276,14 @@ sequenceDiagram
 
 ## 5. 领域边界与模块划分
 
+### 5.0 全局建模原则
+
+`Device` 长期只作为平台与具体物理设备之间的链接定义，是设备实例的稳定锚点。除设备身份、名称、租户/客户归属和少量稳定元数据外，点位和采集任务配置应通过独立领域表关联 `DeviceId`，不继续堆到 `Device` 表中。
+
+系统需要新增“设备大类”设计，用于承载同类设备的默认 Modbus 点位模板。模板应用到设备时，应生成或绑定对应的采集配置记录，而不是把模板内容复制进 `Device` 本体。设备未关联设备大类时，不触发设备大类相关逻辑。
+
+详细原则见 `design-notes/device-anchor-and-category-template.md`。
+
 ### 5.1 接入层
 
 职责：
@@ -301,7 +309,7 @@ sequenceDiagram
 - 针对透传网关生成 Modbus 请求。
 - 通过 MQTT 下发采集请求并接收响应。
 - 解析 Modbus 响应并映射到平台遥测。
-- 对边缘 JSON 数据执行格式校验和字段映射。
+- 边缘 JSON 数据格式校验和字段映射暂不处理。
 
 现有基础：
 
@@ -319,10 +327,11 @@ sequenceDiagram
 
 职责：
 
-- 管理底层设备、网关、产品和设备身份。
+- 管理具体物理设备实例、设备身份和设备大类。
 - 管理暖通业务设备分类。
 - 建立底层数据源与业务设备之间的关系。
 - 支持水泵、主机、阀门、电表、传感器等业务视图。
+- 通过独立表维护设备点位和采集配置。
 
 现有基础：
 
@@ -332,8 +341,15 @@ sequenceDiagram
 - `Produce`
 - `Asset`
 - `AssetRelation`
-- `DeviceTypeProfile`
+- `DeviceCategory`
 - `ProduceDataMapping`
+
+长期策略：
+
+- `Device` 保持为设备实例锚点。
+- 公开模型删除普通设备/网关角色字段；EF 如需判别 `Device` / `Gateway`，使用内部 `DeviceRole` shadow discriminator，不进入业务 API。
+- `DeviceCategories` 作为设备大类表；代码层 `DeviceCategory` 命名仅作过渡，后续可演进为更明确的 `DeviceCategory`。
+- 点位和采集任务通过独立表关联设备。
 
 ### 5.4 数据层
 
@@ -359,7 +375,7 @@ sequenceDiagram
 
 - 定义控制模板。
 - 生成透传网关所需的底层控制数据。
-- 生成边缘网关所需的结构化控制命令。
+- 边缘网关结构化控制命令暂不处理。
 - 管理控制命令状态机。
 - 记录审计和失败原因。
 
@@ -426,7 +442,7 @@ sequenceDiagram
 - 设备认证现有方向包括 AccessToken、DevicePassword 和 X509Certificate。
 - 控制命令必须执行用户权限校验、设备归属校验和操作审计。
 - 透传网关场景需要防止任意 Modbus 写命令绕过平台模板和安全约束。
-- 边缘 JSON 上传需要校验网关身份、Payload 版本、字段白名单和数据范围。
+- 边缘 JSON 上传暂不处理；若后续恢复，需校验网关身份、Payload 版本、字段白名单和数据范围。
 
 ## 8. 技术价值
 
@@ -450,10 +466,12 @@ sequenceDiagram
 ## 10. 架构决策与约束
 
 - 不进行完全重写，继续采用渐进式二次开发。
+- `Device` 不作为点位和采集任务容器，只作为具体物理设备实例锚点。
+- 新增设备大类，用于承载同类设备的 Modbus 点位模板；设备未关联设备大类时不触发模板逻辑。
 - 当前运行时主路径只支持 PostgreSQL、CAP、RabbitMQ、TimescaleDB/InfluxDB。
 - 保留 HTTP、MQTT、CoAP 接入能力，但暖通首期优先 HTTP/MQTT。
 - 透传网关的复杂采集和解析主要在云端实现。
-- 边缘采集网关以 JSON 数据上传为主，云端负责字段映射和存储。
+- 边缘采集网关和边缘 JSON 上传当前暂不纳入实施范围。
 - 底层通信设备与业务暖通设备必须分离建模。
 - API 返回结构继续遵循 `ApiResult<T>`，列表和查询结果统一使用 `{ total, rows }`。
 - 修改 DTO、枚举、公共接口签名、Job 构造函数签名后，必须执行完整 clean/build/run 流程，不能只依赖热重载。
@@ -500,7 +518,7 @@ sequenceDiagram
 | 规则链引擎（FlowRule/FlowRuleProcessor） | 先完成数据入库，规则链后续启用 |
 | 多租户与数据隔离完善 | 当前项目规模暂不需要，最后处理 |
 | 前端架构重构 | 只做最基础的设备管理和数据查看 |
-| 边缘 JSON 接入版本管理 | 原仓库已有功能，后续再评估暖通化需求 |
+| 边缘 JSON 接入版本管理 | 当前需求不考虑边缘网关，暂不处理 |
 | 能耗统计 | 先有数据积累，再构建统计层 |
 
 ## 11. 后续拆分建议
@@ -509,7 +527,7 @@ sequenceDiagram
 
 1. 网关与设备接入模块。
 2. 透传网关 Modbus 采集模块。
-3. 边缘网关 JSON 接入模块。
+3. 边缘网关 JSON 接入模块（当前暂不处理，仅长期预留）。
 4. 点位、模板与映射模块。
 5. 暖通业务设备建模模块。
 6. 控制命令与审计模块。
@@ -517,4 +535,26 @@ sequenceDiagram
 8. 能耗统计模块。
 9. 告警与规则链暖通化模块。
 10. 平台权限、菜单与租户管理完善模块。
+
+## 12. Agent 实施准备审核补充（2026-04-28）
+
+本次代码验证确认：架构文档中的主路径判断基本准确，但后续实施应按“已有能力增强”而不是“空白模块新建”推进。
+
+**已具备主路径：**
+
+- 接入层：HTTP Controller、MQTT Controller、JWT/设备身份、MQTT 连接状态事件已存在。
+- 采集层：`CollectionTask` / `CollectionDevice` / `CollectionPoint` / `CollectionLog`、`CollectionTaskService`、`ModbusCollectionService`、`GatewayScheduler` 已存在。
+- 点位模板：`DeviceCategory`、`CollectionRuleTemplate`、`DeviceCategoryController`、`DeviceCategoryService.ApplyProfileToDeviceAsync` 已存在。
+- 数据层：`TelemetryLatest`、`AttributeLatest`、`TelemetryData`、TimescaleDB/InfluxDB 抽象已存在。
+- 规则告警：`FlowRule`、`FlowRuleProcessor`、`AlarmController` 已存在。
+
+**进入实施前必须修正的架构约束：**
+
+- 新增或改造 HVAC 控制台 API 时，统一返回 `ApiResult<PagedData<T>>`；历史接口允许先兼容保留。
+- `BatchMerger.Optimize()` 已有实现但调度器未调用，属于采集层 P0 技术债。
+- `CollectionConnectionDto.RetryCount` 已定义但未被即时重试逻辑使用，需在实施计划中明确接入或推迟。
+- 前端实现不得再新增 `fs-crud/@fast-crud` 依赖，设备、网关、采集、模板、租户等页面迁移应列入模块计划。
+- `07` 到 `10` 模块已补轻量 implementation-plan，但仍应在第一阶段数据闭环稳定后再进入编码。
+
+完整审核矩阵见 `design-notes/agent-readiness-review-2026-04-28.md`。
 
