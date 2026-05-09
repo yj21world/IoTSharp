@@ -72,7 +72,7 @@ namespace IoTSharp.Controllers
                 _user_menu.Add(
                 new()
                 {
-                    text = "数字孪生",
+                    text = "设备信息",
                     i18n = "",
                     vi18n = "iot.devicemnt",
                     routename = "devicemnt",

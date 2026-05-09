@@ -14,6 +14,7 @@
 import { defineAsyncComponent, computed, ref, onBeforeMount, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { ElMessage } from 'element-plus';
 import { storeToRefs } from 'pinia';
 import { routeRequiresConsoleFeatures } from '/@/bootstrap/routeFeatures';
 import { useTagsViewRoutes } from '/@/stores/tagsViewRoutes';

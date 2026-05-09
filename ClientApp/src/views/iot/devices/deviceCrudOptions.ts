@@ -164,7 +164,7 @@ export const createDeviceCrudOptions = function ({ expose }, customerId, deviceD
 					},
 				},
 				deviceType: {
-					title: '设备类型',
+					title: '接入类型',
 					type: 'dict-select',
 					search: { show: false },
 					dict: dict({
@@ -232,7 +232,7 @@ export const createDeviceCrudOptions = function ({ expose }, customerId, deviceD
 					dict: dict({
 						data: [
 							{ value: 'AccessToken', label: 'AccessToken' },
-							{ value: 'X509Certificate', label: 'X509Certificate' },
+							// { value: 'X509Certificate', label: 'X509Certificate' },
 						],
 					}),
 				},
